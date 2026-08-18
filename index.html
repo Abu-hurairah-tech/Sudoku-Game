@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Sudoku</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Top Middle Section -->
+    <header class="header">
+        <!-- Empty div to balance flex spacing -->
+        <div class="header-spacer"></div> 
+        
+        <div class="header-center">
+            <h1>Sudoku Game</h1>
+            <div id="timer">00:00</div>
+        </div>
+        
+        <!-- Settings Button -->
+        <div class="header-spacer">
+            <button id="settings-btn" title="Settings">⚙️</button>
+        </div>
+    </header>
+    
+    <!-- Main Flexbox Container -->
+    <main class="game-container">
+        
+        <!-- Left Side: Controls & Numpad -->
+        <div class="left-panel">
+            <button id="reset-btn">New Game</button> 
+            <p id="message"></p>
+            
+            <div id="numpad">
+                <div class="numpad-row">
+                    <button class="numpad-btn" data-val="1"><span class="number">1</span><span class="count" id="count-1">9</span></button>
+                    <button class="numpad-btn" data-val="2"><span class="number">2</span><span class="count" id="count-2">9</span></button>
+                    <button class="numpad-btn" data-val="3"><span class="number">3</span><span class="count" id="count-3">9</span></button>
+                    <button class="numpad-btn" data-val="4"><span class="number">4</span><span class="count" id="count-4">9</span></button>
+                    <button class="numpad-btn" data-val="5"><span class="number">5</span><span class="count" id="count-5">9</span></button>
+                </div>
+                <div class="numpad-row">
+                    <button class="numpad-btn" data-val="6"><span class="number">6</span><span class="count" id="count-6">9</span></button>
+                    <button class="numpad-btn" data-val="7"><span class="number">7</span><span class="count" id="count-7">9</span></button>
+                    <button class="numpad-btn" data-val="8"><span class="number">8</span><span class="count" id="count-8">9</span></button>
+                    <button class="numpad-btn" data-val="9"><span class="number">9</span><span class="count" id="count-9">9</span></button>
+                    <button class="numpad-btn" data-val="X"><span class="number">X</span><span class="count">Del</span></button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Side: The Board -->
+        <div class="right-panel">
+            <div id="board"></div>
+        </div>
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content">
+            <span id="close-modal">&times;</span>
+            <h2>Settings</h2>
+            <div class="setting-item">
+                <span>Highlight Matching Numbers</span>
+                <!-- Custom Toggle Switch -->
+                <label class="switch">
+                    <input type="checkbox" id="highlight-toggle" checked>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

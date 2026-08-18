@@ -1,0 +1,316 @@
+/* --- OVERALL LAYOUT --- */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #fafafa;
+    color: #333;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; 
+}
+
+/* --- HEADER & TIMER --- */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 5%;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+}
+
+.header-spacer {
+    width: 50px; /* Balances the header so center is perfectly centered */
+    display: flex;
+    justify-content: flex-end;
+}
+
+.header-center {
+    text-align: center;
+}
+
+.header h1 {
+    margin: 0 0 10px 0;
+}
+
+#timer {
+    font-size: 28px;
+    font-family: monospace; 
+    font-weight: bold;
+    color: #1976d2; 
+}
+
+#settings-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    box-shadow: none;
+    padding: 0;
+    color: #555;
+    transition: transform 0.2s;
+}
+
+#settings-btn:hover {
+    background: none;
+    transform: rotate(45deg);
+}
+
+/* --- LEFT/RIGHT LAYOUT --- */
+.game-container {
+    display: flex;
+    flex: 1; 
+    align-items: center; 
+    justify-content: space-evenly; 
+    padding: 20px 10%; 
+}
+
+.left-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 300px; 
+}
+
+.right-panel {
+    display: flex;
+    justify-content: center;
+}
+
+/* --- THE BOARD --- */
+#board {
+    display: grid;
+    grid-template-columns: repeat(9, 50px);
+    grid-template-rows: repeat(9, 50px);
+    width: max-content;
+}
+
+.cell-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e0e0e0; 
+}
+
+.cell-wrapper:nth-child(-n+9) { border-top: none; }        
+.cell-wrapper:nth-child(n+73) { border-bottom: none; }     
+.cell-wrapper:nth-child(9n+1) { border-left: none; }       
+.cell-wrapper:nth-child(9n) { border-right: none; }        
+
+.cell-wrapper:nth-child(9n+3), 
+.cell-wrapper:nth-child(9n+6) { 
+    border-right: 3px solid #222; 
+}
+.cell-wrapper:nth-child(n+19):nth-child(-n+27),
+.cell-wrapper:nth-child(n+46):nth-child(-n+54) {
+    border-bottom: 3px solid #222;
+}
+
+/* --- THE CELLS --- */
+.cell {
+    width: 38px;
+    height: 38px;
+    font-size: 20px;
+    text-align: center;
+    border: none;
+    outline: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 50%; 
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    caret-color: transparent; 
+}
+
+.cell.selected {
+    background-color: #bbdefb; 
+}
+
+.cell.fixed {
+    background-color: #e0e0e0; 
+    font-weight: bold;
+    cursor: not-allowed;
+    color: #444;
+}
+
+/* NEW: The highlighted circle effect */
+.cell.highlight-circle {
+    box-shadow: 0 0 0 2px #ff9800; /* Draws a nice orange circle without breaking layout */
+    background-color: #fff3e0; /* Very soft orange background */
+}
+
+.cell.fixed.highlight-circle {
+    box-shadow: 0 0 0 2px #ff9800; 
+    background-color: #ffe0b2; /* Slightly darker orange for fixed cells */
+}
+
+/* --- CONTROLS & MESSAGE --- */
+#reset-btn {
+    padding: 12px 25px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    background-color: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    transition: background-color 0.2s;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+#reset-btn:hover {
+    background-color: #115293;
+}
+
+#message {
+    margin-top: 20px;
+    font-size: 18px;
+    font-weight: bold;
+    height: 25px; 
+    text-align: center;
+}
+
+/* --- CUSTOM NUMBER PAD --- */
+#numpad {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.numpad-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.numpad-btn {
+    width: 48px;
+    height: 55px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.1s;
+    padding: 0;
+}
+
+.numpad-btn:hover {
+    background-color: #e3f2fd;
+    border-color: #1976d2;
+}
+
+.numpad-btn:active {
+    background-color: #bbdefb;
+    transform: scale(0.95);
+}
+
+.numpad-btn .number {
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+}
+
+.numpad-btn .count {
+    font-size: 11px; 
+    color: #888;
+    margin-top: 2px;
+}
+
+/* --- MODAL SETTINGS --- */
+.modal {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px 30px;
+    border-radius: 8px;
+    width: 300px;
+    position: relative;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+#close-modal {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #888;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 16px;
+}
+
+/* Toggle Switch CSS */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+}
+
+input:checked + .slider {
+    background-color: #1976d2;
+}
+
+input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+.slider.round {
+    border-radius: 24px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
+}
