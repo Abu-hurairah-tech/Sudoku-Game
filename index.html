@@ -1,77 +1,196 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Modern Sudoku</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-layout">
+      <!-- Vertical Icon Sidebar -->
+      <nav class="sidebar">
+        <button id="nav-new-btn" title="New Game">
+          <img
+            src="Icons/add-svgrepo-com.svg"
+            alt=""
+            height="30px"
+            width="30px"
+          />
+        </button>
+        <button id="nav-difficulty-btn" title="Set Difficulty">
+          <img
+            src="Icons/levels-svgrepo-com.svg"
+            alt=""
+            height="30px"
+            width="30px"
+          />
+        </button>
+        <button id="nav-bulb-btn" title="Tools & Hints">
+          <img
+            src="Icons/bulb-on-svgrepo-com.svg"
+            alt=""
+            height="30px"
+            width="30px"
+          />
+        </button>
+        <button id="nav-undo-btn" title="Undo Last Move">
+          <img
+            src="Icons/undo-svgrepo-com.svg"
+            alt=""
+            height="30px"
+            width="30px"
+          />
+        </button>
+        <button id="nav-restart-btn" title="Restart Current Board">
+          <img
+            src="Icons/restart-svgrepo-com.svg"
+            alt=""
+            height="30px"
+            width="30px"
+          />
+        </button>
+      </nav>
 
-    <!-- Top Middle Section -->
-    <header class="header">
-        <!-- Empty div to balance flex spacing -->
-        <div class="header-spacer"></div> 
-        
-        <div class="header-center">
-            <h1>Sudoku Game</h1>
+      <!-- Main Content Area -->
+      <div class="main-content">
+        <header class="header">
+          <div class="header-left"></div>
+          <div class="header-center">
             <div id="timer">00:00</div>
-        </div>
-        
-        <!-- Settings Button -->
-        <div class="header-spacer">
+          </div>
+          <div class="header-right">
+            <h1>SUDOKU GAME</h1>
             <button id="settings-btn" title="Settings">⚙️</button>
-        </div>
-    </header>
-    
-    <!-- Main Flexbox Container -->
-    <main class="game-container">
-        
-        <!-- Left Side: Controls & Numpad -->
-        <div class="left-panel">
-            <button id="reset-btn">New Game</button> 
+          </div>
+        </header>
+
+        <main class="game-container">
+          <!-- Left Side: Numpad -->
+          <div class="left-panel">
             <p id="message"></p>
-            
             <div id="numpad">
-                <div class="numpad-row">
-                    <button class="numpad-btn" data-val="1"><span class="number">1</span><span class="count" id="count-1">9</span></button>
-                    <button class="numpad-btn" data-val="2"><span class="number">2</span><span class="count" id="count-2">9</span></button>
-                    <button class="numpad-btn" data-val="3"><span class="number">3</span><span class="count" id="count-3">9</span></button>
-                    <button class="numpad-btn" data-val="4"><span class="number">4</span><span class="count" id="count-4">9</span></button>
-                    <button class="numpad-btn" data-val="5"><span class="number">5</span><span class="count" id="count-5">9</span></button>
-                </div>
-                <div class="numpad-row">
-                    <button class="numpad-btn" data-val="6"><span class="number">6</span><span class="count" id="count-6">9</span></button>
-                    <button class="numpad-btn" data-val="7"><span class="number">7</span><span class="count" id="count-7">9</span></button>
-                    <button class="numpad-btn" data-val="8"><span class="number">8</span><span class="count" id="count-8">9</span></button>
-                    <button class="numpad-btn" data-val="9"><span class="number">9</span><span class="count" id="count-9">9</span></button>
-                    <button class="numpad-btn" data-val="X"><span class="number">X</span><span class="count">Del</span></button>
-                </div>
+              <div class="numpad-row">
+                <button class="numpad-btn" data-val="1">
+                  <span class="number">1</span
+                  ><span class="count" id="count-1">9</span>
+                </button>
+                <button class="numpad-btn" data-val="2">
+                  <span class="number">2</span
+                  ><span class="count" id="count-2">9</span>
+                </button>
+                <button class="numpad-btn" data-val="3">
+                  <span class="number">3</span
+                  ><span class="count" id="count-3">9</span>
+                </button>
+                <button class="numpad-btn" data-val="4">
+                  <span class="number">4</span
+                  ><span class="count" id="count-4">9</span>
+                </button>
+                <button class="numpad-btn" data-val="5">
+                  <span class="number">5</span
+                  ><span class="count" id="count-5">9</span>
+                </button>
+              </div>
+              <div class="numpad-row">
+                <button class="numpad-btn" data-val="6">
+                  <span class="number">6</span
+                  ><span class="count" id="count-6">9</span>
+                </button>
+                <button class="numpad-btn" data-val="7">
+                  <span class="number">7</span
+                  ><span class="count" id="count-7">9</span>
+                </button>
+                <button class="numpad-btn" data-val="8">
+                  <span class="number">8</span
+                  ><span class="count" id="count-8">9</span>
+                </button>
+                <button class="numpad-btn" data-val="9">
+                  <span class="number">9</span
+                  ><span class="count" id="count-9">9</span>
+                </button>
+                <button class="numpad-btn" data-val="X">
+                  <span class="number">X</span><span class="count">Del</span>
+                </button>
+              </div>
             </div>
-        </div>
-        
-        <!-- Right Side: The Board -->
-        <div class="right-panel">
+          </div>
+
+          <!-- Right Side: The Board -->
+          <div class="right-panel">
             <div id="board"></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- Bulb Tools Modal -->
+    <div id="tools-modal" class="modal hidden">
+      <div class="modal-content tools-menu">
+        <h2>Game Tools</h2>
+        <button id="tool-validate" class="menu-btn">Validate</button>
+        <button id="tool-hint" class="menu-btn">Get a Hint</button>
+        <button id="tool-notes" class="menu-btn">Automatic Notes</button>
+        <button
+          class="menu-btn secondary close-modal"
+          data-target="tools-modal"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- Difficulty Modal -->
+    <div id="difficulty-modal" class="modal hidden">
+      <div class="modal-content text-center">
+        <span class="close-x close-modal" data-target="difficulty-modal"
+          >&times;</span
+        >
+        <h2>Select Difficulty</h2>
+        <p class="warning-text">
+          Note: Starting a new game will reset your current progress.
+        </p>
+
+        <!-- Sleek Slider -->
+        <div class="difficulty-slider">
+          <button id="diff-prev" class="nav-arrow">❮</button>
+          <div id="diff-display" class="diff-text">Easy</div>
+          <button id="diff-next" class="nav-arrow">❯</button>
         </div>
-    </main>
+
+        <button id="diff-start" class="menu-btn mt-15">Start Game</button>
+      </div>
+    </div>
+
+    <!-- Confirmation Modal (Are you sure?) -->
+    <div id="confirm-modal" class="modal hidden">
+      <div class="modal-content text-center">
+        <h2>Warning</h2>
+        <p id="confirm-message" class="confirm-message">Are you sure?</p>
+        <div class="confirm-actions">
+          <button id="confirm-yes" class="menu-btn">Yes</button>
+          <button id="confirm-no" class="menu-btn secondary">No</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal hidden">
-        <div class="modal-content">
-            <span id="close-modal">&times;</span>
-            <h2>Settings</h2>
-            <div class="setting-item">
-                <span>Highlight Matching Numbers</span>
-                <!-- Custom Toggle Switch -->
-                <label class="switch">
-                    <input type="checkbox" id="highlight-toggle" checked>
-                    <span class="slider round"></span>
-                </label>
-            </div>
+      <div class="modal-content">
+        <span class="close-x close-modal" data-target="settings-modal"
+          >&times;</span
+        >
+        <h2>Settings</h2>
+        <div class="setting-item">
+          <span>Highlight Matching Numbers</span>
+          <label class="switch">
+            <input type="checkbox" id="highlight-toggle" checked />
+            <span class="slider round"></span>
+          </label>
         </div>
+      </div>
     </div>
 
     <script src="script.js"></script>
-</body>
+  </body>
 </html>
