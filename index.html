@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Modern Sudoku</title>
     <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   </head>
   <body>
     <div class="app-layout">
@@ -83,7 +84,14 @@
                 gap: 8px;
               "
             >
-              <span style="font-size: 20px"><img src="Icons/pen-solid-full.svg" alt="" height="20px" width="20px"></span> Pencil Mode: OFF
+              <span style="font-size: 20px"
+                ><img
+                  src="Icons/pen-solid-full.svg"
+                  alt=""
+                  height="20px"
+                  width="20px"
+              /></span>
+              Pencil Mode: OFF
             </button>
 
             <div id="numpad">
@@ -202,6 +210,14 @@
           <span>Highlight Matching Numbers</span>
           <label class="switch">
             <input type="checkbox" id="highlight-toggle" checked />
+            <span class="slider round"></span>
+          </label>
+        </div>
+        <!-- NEW: Dark Mode Toggle -->
+        <div class="setting-item" style="margin-top: 15px">
+          <span>Dark Mode</span>
+          <label class="switch">
+            <input type="checkbox" id="dark-mode-toggle" />
             <span class="slider round"></span>
           </label>
         </div>

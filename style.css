@@ -1,293 +1,245 @@
+/* --- CSS VARIABLES FOR THEMING --- */
+:root {
+  --bg-color: #fafafa;
+  --text-color: #333;
+  --header-bg: #fff;
+  --sidebar-bg: #ffffff;
+  --timer-color: #888;
+  --h1-color: #222;
+  --board-border: #e0e0e0;
+  --thick-border: #222;
+  --cell-selected: #bbdefb;
+  --cell-fixed-bg: #e0e0e0;
+  --cell-fixed-text: #444;
+  --highlight-bg: #fff3e0;
+  --highlight-border: #ff9800;
+  --error-bg: #ffebee;
+  --error-text: #d32f2f;
+  --hint-flash-bg: #d1fae5;
+  --numpad-bg: #fff;
+  --numpad-border: #ccc;
+  --numpad-hover: #e3f2fd;
+  --numpad-text: #333;
+  --modal-overlay: rgba(0,0,0,0.5);
+  --modal-bg: white;
+  --btn-secondary: #e0e0e0;
+  --btn-secondary-hover: #ccc;
+  --slider-bg: #f5f5f5;
+  --note-color: #666;
+}
+
+body.dark-mode {
+  --bg-color: #121212;
+  --text-color: #e0e0e0;
+  --header-bg: #1e1e1e;
+  --sidebar-bg: #1a1a1a;
+  --timer-color: #aaa;
+  --h1-color: #fff;
+  --board-border: #333;
+  --thick-border: #888;
+  --cell-selected: #0d47a1;
+  --cell-fixed-bg: #2c2c2c;
+  --cell-fixed-text: #aaa;
+  --highlight-bg: #4e342e;
+  --highlight-border: #ff9800;
+  --error-bg: #b71c1c;
+  --error-text: #ffcdd2;
+  --hint-flash-bg: #1b5e20;
+  --numpad-bg: #2c2c2c;
+  --numpad-border: #555;
+  --numpad-hover: #1976d2;
+  --numpad-text: #e0e0e0;
+  --modal-overlay: rgba(0,0,0,0.7);
+  --modal-bg: #1e1e1e;
+  --btn-secondary: #444;
+  --btn-secondary-hover: #555;
+  --slider-bg: #2c2c2c;
+  --note-color: #aaa;
+}
+
 /* --- OVERALL LAYOUT --- */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #fafafa;
-    color: #333;
-    margin: 0;
-    padding: 0;
-    height: 100vh; 
-    overflow: hidden; 
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  margin: 0;
+  padding: 0;
+  height: 100vh; 
+  overflow: hidden; 
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .app-layout {
-    display: flex;
-    height: 100vh;
+  display: flex;
+  height: 100vh;
 }
 
 /* --- VERTICAL SIDEBAR --- */
 .sidebar {
-    width: 70px;
-    background-color: #ffffff; 
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding-top: 20px;
-    gap: 30px;
+  width: 70px;
+  background-color: var(--sidebar-bg); 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 20px;
+  gap: 30px;
+  transition: background-color 0.3s;
 }
 
 .sidebar button {
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: white;
-    cursor: pointer;
-    transition: transform 0.2s, opacity 0.2s;
-    opacity: 0.7;
-    padding: 10px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: white;
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.2s;
+  opacity: 0.7;
+  padding: 10px;
 }
-
-.sidebar button:hover {
-    transform: scale(1.2);
-    opacity: 1;
-}
+.sidebar button:hover { transform: scale(1.2); opacity: 1; }
+body.dark-mode .sidebar button img { filter: invert(1); } /* Makes dark icons white */
 
 /* --- MAIN CONTENT & HEADER --- */
-.main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
+.main-content { flex: 1; display: flex; flex-direction: column; }
 .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 30px;
-    background-color: #fff;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 15px 30px; background-color: var(--header-bg);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+  transition: background-color 0.3s;
 }
-
 .header-left, .header-center, .header-right { flex: 1; }
 .header-center { text-align: center; }
 
-#timer {
-    font-size: 14px;
-    font-family: monospace; 
-    font-weight: bold;
-    color: #888; 
-}
+#timer { font-size: 14px; font-family: monospace; font-weight: bold; color: var(--timer-color); }
 
-.header-right {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 15px;
-}
+.header-right { display: flex; justify-content: flex-end; align-items: center; gap: 15px; }
+.header h1 { margin: 0; font-size: 22px; letter-spacing: 1px; color: var(--h1-color); }
 
-.header h1 {
-    margin: 0;
-    font-size: 22px;
-    letter-spacing: 1px;
-    color: #222;
-}
-
-#settings-btn {
-    background: none;
-    border: none;
-    font-size: 22px;
-    cursor: pointer;
-    color: #555;
-    transition: transform 0.2s;
-    padding: 0;
-}
+#settings-btn { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--timer-color); transition: transform 0.2s; padding: 0; }
 #settings-btn:hover { transform: rotate(45deg); }
 
 /* --- LEFT/RIGHT BOARD LAYOUT --- */
-.game-container {
-    display: flex;
-    flex: 1; 
-    align-items: center; 
-    justify-content: space-between; 
-    gap: 50px;
-    padding: 20px; 
-}
-
-.left-panel {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 300px; 
-}
-
+.game-container { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 50px; padding: 20px; }
+.left-panel { display: flex; flex-direction: column; align-items: center; width: 300px; }
 .right-panel { display: flex; justify-content: center; }
 
 /* --- THE BOARD --- */
-#board {
-    display: grid;
-    grid-template-columns: repeat(9, 50px);
-    grid-template-rows: repeat(9, 50px);
-    width: max-content;
-}
-
-.cell-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid #e0e0e0; 
-}
+#board { display: grid; grid-template-columns: repeat(9, 50px); grid-template-rows: repeat(9, 50px); width: max-content; }
+.cell-wrapper { display: flex; align-items: center; justify-content: center; border: 1px solid var(--board-border); transition: border-color 0.3s; }
 
 .cell-wrapper:nth-child(-n+9) { border-top: none; }        
 .cell-wrapper:nth-child(n+73) { border-bottom: none; }     
 .cell-wrapper:nth-child(9n+1) { border-left: none; }       
 .cell-wrapper:nth-child(9n) { border-right: none; }        
-.cell-wrapper:nth-child(9n+3), 
-.cell-wrapper:nth-child(9n+6) { border-right: 3px solid #222; }
-.cell-wrapper:nth-child(n+19):nth-child(-n+27),
-.cell-wrapper:nth-child(n+46):nth-child(-n+54) { border-bottom: 3px solid #222; }
+.cell-wrapper:nth-child(9n+3), .cell-wrapper:nth-child(9n+6) { border-right: 3px solid var(--thick-border); }
+.cell-wrapper:nth-child(n+19):nth-child(-n+27), .cell-wrapper:nth-child(n+46):nth-child(-n+54) { border-bottom: 3px solid var(--thick-border); }
 
 /* --- THE CELLS --- */
 .cell {
-    /* Existing styles remain */
-    width: 38px;
-    height: 38px;
-    font-size: 22px;
-    text-align: center;
-    border: none;
-    outline: none;
-    background: transparent;
-    cursor: pointer;
-    border-radius: 50%; 
-    transition: background-color 0.2s ease, box-shadow 0.2s ease;
-    
-    /* NEW: Flexbox to perfectly center big numbers */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    user-select: none;
+  width: 38px; height: 38px; font-size: 22px; text-align: center; border: none; outline: none; background: transparent;
+  cursor: pointer; border-radius: 50%; transition: background-color 0.2s ease, box-shadow 0.2s ease, color 0.3s;
+  display: flex; align-items: center; justify-content: center; position: relative; user-select: none; color: var(--text-color);
+}
+.cell .big-number { pointer-events: none; }
+.cell.selected { background-color: var(--cell-selected); }
+.cell.fixed { background-color: var(--cell-fixed-bg); font-weight: bold; cursor: not-allowed; color: var(--cell-fixed-text); }
+.cell.highlight-circle { box-shadow: 0 0 0 2px var(--highlight-border); background-color: var(--highlight-bg); }
+.cell.fixed.highlight-circle { box-shadow: 0 0 0 2px var(--highlight-border); }
+
+/* VALIDATION HIGHLIGHT */
+.cell.error-highlight { background-color: var(--error-bg); color: var(--error-text) !important; box-shadow: inset 0 0 0 2px var(--error-text); }
+
+/* HINT ANIMATION */
+.hint-flash { animation: soft-blink 1s ease-in-out 3; }
+@keyframes soft-blink {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: var(--hint-flash-bg); }
 }
 
-.cell .big-number {
-    pointer-events: none; /* Let clicks pass through to the cell */
-}
+/* --- NOTES (PENCIL MARKS) GRID --- */
+.notes-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; pointer-events: none; }
+.note { font-size: 11px; color: var(--note-color); display: flex; align-items: center; justify-content: center; line-height: 1; }
+.note.highlight-circle { background-color: var(--highlight-bg); color: var(--highlight-border); border-radius: 50%; font-weight: bold; box-shadow: none; }
 
-.cell.selected { background-color: #bbdefb; }
-.cell.fixed { background-color: #e0e0e0; font-weight: bold; cursor: not-allowed; color: #444; }
-.cell.highlight-circle { box-shadow: 0 0 0 2px #ff9800; background-color: #fff3e0; }
-.cell.fixed.highlight-circle { box-shadow: 0 0 0 2px #ff9800; background-color: #ffe0b2; }
-
-/* --- VALIDATION ERROR HIGHLIGHT --- */
-.cell.error-highlight {
-    background-color: #ffebee; /* Light red background */
-    color: #d32f2f !important; /* Bright red text */
-    box-shadow: inset 0 0 0 2px #d32f2f; /* Inner red border to make it pop */
-}
-
-/* --- MESSAGE --- */
+/* --- CONTROLS --- */
 #message { margin-top: 0; margin-bottom: 15px; font-size: 18px; font-weight: bold; height: 25px; text-align: center; }
-
-/* --- CUSTOM NUMBER PAD --- */
 #numpad { display: flex; flex-direction: column; gap: 10px; }
 .numpad-row { display: flex; justify-content: center; gap: 10px; }
 .numpad-btn {
-    width: 48px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    background-color: #fff; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; transition: 0.1s; padding: 0;
+  width: 48px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background-color: var(--numpad-bg); border: 1px solid var(--numpad-border); border-radius: 8px; cursor: pointer; transition: 0.1s; padding: 0; color: var(--numpad-text);
 }
-.numpad-btn:hover { background-color: #e3f2fd; border-color: #1976d2; }
-.numpad-btn:active { background-color: #bbdefb; transform: scale(0.95); }
-.numpad-btn .number { font-size: 20px; font-weight: bold; color: #333; }
-.numpad-btn .count { font-size: 11px; color: #888; margin-top: 2px; }
+.numpad-btn:hover { background-color: var(--numpad-hover); border-color: #1976d2; }
+.numpad-btn:active { transform: scale(0.95); }
+.numpad-btn .number { font-size: 20px; font-weight: bold; color: inherit; }
+.numpad-btn .count { font-size: 11px; color: var(--timer-color); margin-top: 2px; }
+
+#pencil-btn { color: var(--text-color); }
+#pencil-btn.active { background-color: var(--highlight-border); color: white; }
 
 /* --- MODALS --- */
 .modal {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);
-    display: flex; align-items: center; justify-content: center; z-index: 1000;
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--modal-overlay);
+  display: flex; align-items: center; justify-content: center; z-index: 1000; transition: background-color 0.3s;
 }
 .modal.hidden { display: none; }
 .modal-content {
-    background-color: white; padding: 25px 30px; border-radius: 12px; width: 320px; position: relative;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  background-color: var(--modal-bg); padding: 25px 30px; border-radius: 12px; width: 320px; position: relative;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2); transition: background-color 0.3s, color 0.3s;
 }
-.modal-content h2 { margin-top: 0; margin-bottom: 20px; text-align: center; color: #222;}
+.modal-content h2 { margin-top: 0; margin-bottom: 20px; text-align: center; color: var(--text-color);}
 .text-center { text-align: center; }
-
-.close-x {
-    position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #888; transition: color 0.2s;
-}
-.close-x:hover { color: #333; }
-
+.close-x { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: var(--timer-color); transition: color 0.2s; }
+.close-x:hover { color: var(--text-color); }
 .setting-item { display: flex; justify-content: space-between; align-items: center; font-size: 16px; }
 .tools-menu { display: flex; flex-direction: column; gap: 10px; }
 .menu-btn {
-    padding: 12px; font-size: 16px; background-color: #1976d2; color: white; border: none;
-    border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; width: 100%; display: block;
+  padding: 12px; font-size: 16px; background-color: #1976d2; color: white; border: none;
+  border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; width: 100%; display: block;
 }
 .menu-btn:hover { background-color: #115293; }
-.menu-btn.secondary { background-color: #e0e0e0; color: #333; }
-.menu-btn.secondary:hover { background-color: #ccc; }
+.menu-btn.secondary { background-color: var(--btn-secondary); color: var(--text-color); }
+.menu-btn.secondary:hover { background-color: var(--btn-secondary-hover); }
 .mt-15 { margin-top: 15px; }
 
-/* --- NEW: Difficulty Slider Styles --- */
+/* --- Difficulty Slider --- */
 .difficulty-slider {
-    display: flex; justify-content: space-between; align-items: center; 
-    background-color: #f5f5f5; border-radius: 8px; padding: 10px; margin: 15px 0;
+  display: flex; justify-content: space-between; align-items: center; 
+  background-color: var(--slider-bg); border-radius: 8px; padding: 10px; margin: 15px 0; transition: background-color 0.3s;
 }
-.nav-arrow {
-    background: none; border: none; font-size: 20px; color: #1976d2; cursor: pointer; padding: 5px 15px; transition: transform 0.1s;
-}
+.nav-arrow { background: none; border: none; font-size: 20px; color: #1976d2; cursor: pointer; padding: 5px 15px; transition: transform 0.1s; }
 .nav-arrow:active { transform: scale(0.9); }
 .nav-arrow:hover { color: #115293; }
-.diff-text { font-size: 18px; font-weight: bold; color: #333; width: 100px; text-align: center; }
+.diff-text { font-size: 18px; font-weight: bold; color: var(--text-color); width: 100px; text-align: center; }
 .warning-text { font-size: 13px; color: #d32f2f; margin-bottom: 10px; font-style: italic; }
-
-/* --- NEW: Confirmation Modal Styles --- */
-.confirm-message { font-size: 16px; margin-bottom: 20px; color: #555;}
+.confirm-message { font-size: 16px; margin-bottom: 20px; color: var(--text-color);}
 .confirm-actions { display: flex; gap: 10px; justify-content: center; }
 
-/* Toggle Switch CSS */
+/* --- Toggle Switch CSS --- */
 .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
 .switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--numpad-border); transition: .4s; }
 .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; }
 input:checked + .slider { background-color: #1976d2; }
 input:checked + .slider:before { transform: translateX(20px); }
 .slider.round { border-radius: 24px; }
 .slider.round:before { border-radius: 50%; }
 
-/* --- HINT FLASH ANIMATION --- */
-.hint-flash {
-    animation: soft-blink 1s ease-in-out 3; 
+/* --- NEW: Numpad Highlight Active State --- */
+.numpad-btn.highlight-active {
+  background-color: var(--highlight-bg);
+  border-color: var(--highlight-border);
+}
+.numpad-btn.highlight-active .number {
+  color: var(--highlight-border);
 }
 
-@keyframes soft-blink {
-    0%, 100% { 
-        background-color: #fff; 
-    }
-    50% { 
-        background-color: #d1fae5; /* Soft green */
-    }
+/* --- NEW: WIN ANIMATION --- */
+.board-win-pulse {
+  animation: win-pulse 1s ease-out;
 }
-
-/* --- NOTES (PENCIL MARKS) GRID --- */
-.notes-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(3, 1fr);
-    width: 100%;
-    height: 100%;
-    pointer-events: none; 
-}
-
-.note {
-    font-size: 11px;
-    color: #666;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-}
-
-/* Highlights specific tiny notes when a number is selected */
-.note.highlight-circle {
-    background-color: #fff3e0;
-    color: #ff9800;
-    border-radius: 50%;
-    font-weight: bold;
-    box-shadow: none; /* Override big cell shadow */
-}
-
-/* Pencil Button Active State */
-#pencil-btn.active {
-    background-color: #ff9800;
-    color: white;
+@keyframes win-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); box-shadow: 0 0 30px #4caf50; }
+  100% { transform: scale(1); }
 }
