@@ -23,6 +23,85 @@ const timerElement = document.getElementById("timer");
 const boardElement = document.getElementById("board");
 const message = document.getElementById("message");
 
+// --- SHARED HINT LIMIT ---
+// Both the classic bulb "Get a Hint" tool and the AI Tutor draw from the same
+// per-game pool, so a player can't sidestep the cap by switching tools.
+const HINTS_PER_GAME = 5;
+let hintsRemaining = HINTS_PER_GAME;
+
+function updateHintCounterDisplay() {
+  const text = `Hints left: ${hintsRemaining}/${HINTS_PER_GAME}`;
+  const t1 = document.getElementById("tools-hint-counter");
+  if (t1) t1.innerText = text;
+  const t2 = document.getElementById("ai-hint-counter");
+  if (t2) t2.innerText = text;
+
+  const revealBtn = document.getElementById("hint-reveal-btn");
+  if (revealBtn) revealBtn.disabled = hintsRemaining <= 0;
+}
+
+// Attempts to spend one hint from the shared pool. Returns false (and spends
+// nothing) once the pool is empty for this game.
+function useHint() {
+  if (hintsRemaining <= 0) return false;
+  hintsRemaining--;
+  const profile = loadAiProfile();
+  profile.hintsUsedTotal++;
+  saveAiProfile(profile);
+  updateHintCounterDisplay();
+  return true;
+}
+
+function resetHintsForNewGame() {
+  hintsRemaining = HINTS_PER_GAME;
+  updateHintCounterDisplay();
+}
+
+// --- AI TUTOR LEARNING PROFILE (persisted locally, grows with play) ---
+// This is what lets the tutor "grow": it's not a live neural net, but a
+// small profile stored in the browser that remembers how many times each
+// technique has already been taught to this player, how many puzzles
+// they've finished, and how many of those needed zero hints. The tutor
+// reads this profile every time it explains something and adapts its
+// wording accordingly (see getAdaptiveTechniqueMsg below).
+const AI_PROFILE_KEY = "sudoku-ai-profile";
+const MASTERY_THRESHOLD = 3;
+
+function loadAiProfile() {
+  const defaults = {
+    gamesCompleted: 0,
+    hintsUsedTotal: 0,
+    noHintWins: 0,
+    techniqueExposure: {
+      "Naked Single": 0,
+      "Hidden Single": 0,
+      "Naked Pair": 0,
+    },
+  };
+  try {
+    const raw = JSON.parse(localStorage.getItem(AI_PROFILE_KEY));
+    if (!raw) return defaults;
+    return {
+      ...defaults,
+      ...raw,
+      techniqueExposure: {
+        ...defaults.techniqueExposure,
+        ...(raw.techniqueExposure || {}),
+      },
+    };
+  } catch (e) {
+    return defaults;
+  }
+}
+
+function saveAiProfile(profile) {
+  try {
+    localStorage.setItem(AI_PROFILE_KEY, JSON.stringify(profile));
+  } catch (e) {
+    /* localStorage unavailable - the tutor just won't remember this session */
+  }
+}
+
 // --- ALGORITHM: SUDOKU BACKTRACKING ENGINE ---
 function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
@@ -324,6 +403,7 @@ function restartCurrentGame() {
   message.innerText = "";
   startTimer();
   resetAiTutorState();
+  resetHintsForNewGame();
 }
 
 function undoLastMove() {
@@ -463,6 +543,13 @@ function checkBoard() {
     }
     refreshBestTimeDisplay();
 
+    // Feed the AI Tutor's learning profile so it can greet the player
+    // with real progress next time, and notice hint-free wins.
+    const aiProfile = loadAiProfile();
+    aiProfile.gamesCompleted++;
+    if (hintsRemaining === HINTS_PER_GAME) aiProfile.noHintWins++;
+    saveAiProfile(aiProfile);
+
     message.innerText = isNewBest
       ? `New Best! You solved ${diffName} Mode in ${formatTime(secondsElapsed)}!`
       : `Congratulations! You solved ${diffName} Mode in ${formatTime(secondsElapsed)}!`;
@@ -489,6 +576,7 @@ function startNewGame() {
     refreshBestTimeDisplay();
     message.innerText = "";
     resetAiTutorState();
+    resetHintsForNewGame();
     clearAiChatLog();
 
     for (let row = 0; row < 9; row++) {
@@ -835,8 +923,15 @@ document.getElementById("hint-gotit-btn").addEventListener("click", () => {
 });
 
 document.getElementById("hint-reveal-btn").addEventListener("click", () => {
-  document.getElementById("hint-modal").classList.add("hidden");
   if (!hintTargetCell) return;
+
+  if (!useHint()) {
+    document.getElementById("hint-explanation").innerText =
+      "You've used all your hints for this game — you've already got the logic for this one, give it a shot!";
+    return;
+  }
+
+  document.getElementById("hint-modal").classList.add("hidden");
 
   moveHistory.push(getBoardSnapshot());
   redoStack = [];
@@ -1202,6 +1297,20 @@ function findNakedPair(board, emptyCells) {
   return null;
 }
 
+// Chooses between the full explanation and a shorter, more confident version
+// once the player's local profile shows they've been taught this technique
+// several times already. This is the "growing" behavior: the same puzzle
+// state produces a different explanation depending on play history.
+function getAdaptiveTechniqueMsg(result, profile) {
+  const exposure = profile.techniqueExposure[result.technique] || 0;
+  if (exposure < MASTERY_THRESHOLD) return result.techniqueMsg;
+
+  if (result.technique === "Naked Pair") {
+    return `Another Naked Pair — you know this one: two squares in this ${result.areaType} share the same two candidates, so those digits can be crossed off every other square's notes in that ${result.areaType}.`;
+  }
+  return `You've spotted a ${result.technique} before — ${result.areaLabel} only leaves room for one number in one particular square. See it?`;
+}
+
 function runAiAnalysis() {
   const { board, emptyCells } = getConstraintBoardAndEmpties();
   if (emptyCells.length === 0) return { technique: "Complete" };
@@ -1298,16 +1407,35 @@ function advanceAiHint() {
   }
 
   if (aiTutorState.stage === 1) {
-    addAiMessage(aiTutorState.techniqueMsg, "ai");
+    // This is a teaching step, not an answer - it never spends a hint, no
+    // matter how many times the player asks to hear it again.
+    const profile = loadAiProfile();
+    profile.techniqueExposure[aiTutorState.technique] =
+      (profile.techniqueExposure[aiTutorState.technique] || 0) + 1;
+    saveAiProfile(profile);
+
+    addAiMessage(getAdaptiveTechniqueMsg(aiTutorState, profile), "ai");
     aiTutorState.stage = 2;
     aiActionHintBtn.innerText =
       aiTutorState.technique === "Naked Pair"
         ? "Apply it for me"
-        : "Show me the answer";
+        : "Just tell me the answer";
     return;
   }
 
   if (aiTutorState.stage === 2) {
+    // Only now - after the area and the technique have both been shown, and
+    // the player has explicitly asked for it - does the AI actually hand
+    // over the answer, and only if the shared hint pool still has room.
+    if (!useHint()) {
+      addAiMessage(
+        `You've used all ${HINTS_PER_GAME} hints for this game — but you've already got the logic for this one. Give it a shot!`,
+        "ai",
+      );
+      resetAiTutorState();
+      return;
+    }
+
     if (aiTutorState.technique === "Advanced") {
       revealFallbackCell(aiTutorState.cell);
     } else if (aiTutorState.technique === "Naked Pair") {
@@ -1421,7 +1549,13 @@ function handleAiChatInput(rawText) {
 
   const lower = text.toLowerCase();
 
-  if (/(hint|stuck|help|clue|next step)/.test(lower)) {
+  if (
+    /(hint|stuck|help|clue|next step|answer|reveal|trick|explain)/.test(lower)
+  ) {
+    // advanceAiHint only ever moves the tutor forward one tier per call, so
+    // even a message like "just tell me the answer" can't skip straight to
+    // the reveal - it still has to pass through the area and technique
+    // explanations first, exactly like the buttons do.
     advanceAiHint();
   } else if (/(check|valid|correct|mistake|error)/.test(lower)) {
     runAiCheckBoard();
@@ -1468,12 +1602,25 @@ if (aiChatInput) {
 document.getElementById("nav-ai-btn").addEventListener("click", () => {
   document.getElementById("ai-tutor-modal").classList.remove("hidden");
   if (aiChatLog && aiChatLog.children.length === 0) {
-    addAiMessage(
-      "Hi! I'm your AI Sudoku tutor. Grab a hint and I'll walk you through the logic step by step, or ask me to check your board for mistakes.",
-      "ai",
-    );
+    const profile = loadAiProfile();
+    if (profile.gamesCompleted > 0 || profile.hintsUsedTotal > 0) {
+      const hintFreeNote =
+        profile.noHintWins > 0
+          ? `, ${profile.noHintWins} of them without a single hint`
+          : "";
+      addAiMessage(
+        `Welcome back! We've finished ${profile.gamesCompleted} puzzle${profile.gamesCompleted === 1 ? "" : "s"} together so far${hintFreeNote}. Grab a hint any time, or ask me to check your board.`,
+        "ai",
+      );
+    } else {
+      addAiMessage(
+        "Hi! I'm your AI Sudoku tutor. Grab a hint and I'll walk you through the logic step by step - area first, then the technique, and I'll only give you the actual number if you ask for it after that. You can also ask me to check your board for mistakes.",
+        "ai",
+      );
+    }
   }
 });
 
 loadPersistedSettings();
+updateHintCounterDisplay();
 startNewGame();

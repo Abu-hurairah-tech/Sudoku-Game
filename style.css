@@ -254,7 +254,22 @@ body.dark-mode .sidebar button img { filter: invert(1); } /* Makes dark icons wh
 .menu-btn:hover { background-color: #115293; }
 .menu-btn.secondary { background-color: var(--btn-secondary); color: var(--text-color); }
 .menu-btn.secondary:hover { background-color: var(--btn-secondary-hover); }
+.menu-btn:disabled, .menu-btn:disabled:hover {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--btn-secondary);
+  color: var(--text-color);
+}
 .mt-15 { margin-top: 15px; }
+
+/* Shared hint-limit counter, shown in both the Tools menu and AI Tutor */
+.hint-counter-text {
+  text-align: center;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--timer-color);
+  margin: -8px 0 15px;
+}
 
 /* --- Hint Explanation Text --- */
 .hint-explanation-text { font-size: 15px; line-height: 1.5; color: var(--text-color); margin-bottom: 20px; text-align: left; }
