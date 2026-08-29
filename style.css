@@ -88,6 +88,29 @@ body {
   height: 100vh;
 }
 
+/* --- ACCESSIBILITY: visible keyboard focus ring everywhere --- */
+:focus-visible {
+  outline: 2px solid var(--ai-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.cell:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Respect the OS-level "reduce motion" preference: kill decorative
+   animation/transition durations without breaking layout. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* --- VERTICAL SIDEBAR --- */
 .sidebar {
   width: 70px;
@@ -112,6 +135,7 @@ body {
   padding: 10px;
 }
 .sidebar button:hover { transform: scale(1.2); opacity: 1; }
+.sidebar button:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
 body.dark-mode .sidebar button img { filter: invert(1); } /* Makes dark icons white */
 
 /* Redo icon reuses the undo icon, mirrored */
@@ -121,12 +145,16 @@ body.dark-mode .sidebar button img { filter: invert(1); } /* Makes dark icons wh
 /* Pushes the AI Tutor button to the bottom of the sidebar */
 .sidebar-spacer { flex: 1; }
 
-/* AI Tutor sidebar button - visually distinct accent so it reads as "smart" */
+/* AI Tutor sidebar button */
 .ai-nav-btn {
   opacity: 1 !important;
   border-radius: 50%;
   background: var(--ai-accent-bg) !important;
   box-shadow: 0 0 0 1px rgba(142, 36, 170, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px; /* Adjust padding to fit the new image */
 }
 .ai-nav-btn:hover {
   box-shadow: 0 0 12px rgba(142, 36, 170, 0.45);
@@ -159,7 +187,25 @@ body.dark-mode .sidebar button img { filter: invert(1); } /* Makes dark icons wh
 .right-panel { display: flex; justify-content: center; }
 
 /* --- THE BOARD --- */
-#board { display: grid; grid-template-columns: repeat(9, var(--cell-size)); grid-template-rows: repeat(9, var(--cell-size)); width: max-content; }
+#board { display: grid; grid-template-columns: repeat(9, var(--cell-size)); grid-template-rows: repeat(9, var(--cell-size)); width: max-content; transition: opacity 0.15s ease; }
+
+/* While a new puzzle is being generated (worker call in flight, or the
+   synchronous fallback path), dim the board slightly and show a spinner
+   so it reads as "working" rather than "frozen". */
+body.generating #board { opacity: 0.45; pointer-events: none; }
+.generating-spinner {
+  display: none;
+  width: 18px;
+  height: 18px;
+  margin: 6px auto 0;
+  border: 2px solid var(--btn-secondary);
+  border-top-color: var(--ai-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+body.generating .generating-spinner { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .cell-wrapper { display: flex; align-items: center; justify-content: center; border: 1px solid var(--board-border); transition: border-color 0.3s; }
 
 .cell-wrapper:nth-child(-n+9) { border-top: none; }
@@ -171,7 +217,7 @@ body.dark-mode .sidebar button img { filter: invert(1); } /* Makes dark icons wh
 
 /* --- THE CELLS --- */
 .cell {
-  width: calc(var(--cell-size) - 12px); height: calc(var(--cell-size) - 12px);
+  width: calc(var(--cell-size) - 10px); height: calc(var(--cell-size) - 10px);
   font-size: calc(var(--cell-size) * 0.44); text-align: center; border: none; outline: none; background: transparent;
   cursor: pointer; border-radius: 50%; transition: background-color 0.2s ease, box-shadow 0.2s ease, color 0.3s;
   display: flex; align-items: center; justify-content: center; position: relative; user-select: none; color: var(--text-color);
@@ -210,11 +256,22 @@ body.dark-mode .sidebar button img { filter: invert(1); } /* Makes dark icons wh
 
 /* --- NOTES (PENCIL MARKS) GRID --- */
 .notes-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; pointer-events: none; }
-.note { font-size: max(9px, calc(var(--cell-size) * 0.2)); color: var(--note-color); display: flex; align-items: center; justify-content: center; line-height: 1; }
+.note {
+  font-size: max(10px, calc(var(--cell-size) * 0.22));
+  color: var(--note-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
 .note.highlight-circle { background-color: var(--highlight-bg); color: var(--highlight-border); border-radius: 50%; font-weight: bold; box-shadow: none; }
 
 /* --- CONTROLS --- */
 #message { margin-top: 0; margin-bottom: 15px; font-size: 18px; font-weight: bold; height: auto; min-height: 25px; text-align: center; }
+body.generating #message { animation: pulse-text 1.1s ease-in-out infinite; }
+@keyframes pulse-text { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
 #numpad { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 .numpad-row { display: flex; justify-content: center; gap: 10px; }
 .numpad-btn {
@@ -296,6 +353,7 @@ input:checked + .slider { background-color: #1976d2; }
 input:checked + .slider:before { transform: translateX(20px); }
 .slider.round { border-radius: 24px; }
 .slider.round:before { border-radius: 50%; }
+.switch input:focus-visible + .slider { outline: 2px solid var(--ai-accent); outline-offset: 2px; }
 
 /* --- Numpad Highlight Active State --- */
 .numpad-btn.highlight-active {
@@ -466,8 +524,11 @@ input:checked + .slider:before { transform: translateX(20px); }
 
 @media (max-width: 380px) {
   :root {
-    --cell-size: clamp(24px, 8.2vw, 36px);
+    /* Slightly larger floor than before (24px -> 26px) so pencil-mark
+       notes stay legible instead of clipping on very small phones. */
+    --cell-size: clamp(26px, 8.4vw, 36px);
   }
   .header h1 { display: none; } /* keep the timer/settings visible, drop the title to save space */
   .numpad-btn .count { display: none; }
+  .note { font-size: max(9px, calc(var(--cell-size) * 0.24)); letter-spacing: -0.8px; }
 }

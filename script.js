@@ -102,15 +102,7 @@ function saveAiProfile(profile) {
   }
 }
 
-// --- ALGORITHM: SUDOKU BACKTRACKING ENGINE ---
-function shuffleArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
-}
-
+// --- ALGORITHM: SUDOKU HELPERS (used client-side for hint/notes reasoning) ---
 function isSafe(board, row, col, num) {
   for (let x = 0; x < 9; x++) {
     if (board[row][x] === num || board[x][col] === num) return false;
@@ -125,7 +117,20 @@ function isSafe(board, row, col, num) {
   return true;
 }
 
-function findEmpty(board) {
+// --- SYNCHRONOUS GENERATION (fallback only) ---
+// The real generation work runs in sudoku-worker.js off the main thread.
+// These synchronous versions are kept as a safety net for environments where
+// Web Workers can't load (e.g. some setups serving the page over file://),
+// so the game still works everywhere, just without the async win there.
+function shuffleArraySync(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+function findEmptySync(board) {
   for (let r = 0; r < 9; r++) {
     for (let c = 0; c < 9; c++) {
       if (board[r][c] === 0) return [r, c];
@@ -134,30 +139,30 @@ function findEmpty(board) {
   return null;
 }
 
-function solveBoard(board) {
-  let emptyPos = findEmpty(board);
+function solveBoardSync(board) {
+  let emptyPos = findEmptySync(board);
   if (!emptyPos) return true;
   let [row, col] = emptyPos;
-  let nums = shuffleArray([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  let nums = shuffleArraySync([1, 2, 3, 4, 5, 6, 7, 8, 9]);
   for (let num of nums) {
     if (isSafe(board, row, col, num)) {
       board[row][col] = num;
-      if (solveBoard(board)) return true;
+      if (solveBoardSync(board)) return true;
       board[row][col] = 0;
     }
   }
   return false;
 }
 
-function countSolutions(board) {
-  let emptyPos = findEmpty(board);
+function countSolutionsSync(board) {
+  let emptyPos = findEmptySync(board);
   if (!emptyPos) return 1;
   let [row, col] = emptyPos;
   let count = 0;
   for (let num = 1; num <= 9; num++) {
     if (isSafe(board, row, col, num)) {
       board[row][col] = num;
-      count += countSolutions(board);
+      count += countSolutionsSync(board);
       board[row][col] = 0;
       if (count > 1) return count;
     }
@@ -165,10 +170,10 @@ function countSolutions(board) {
   return count;
 }
 
-function generateNewPuzzle(difficultyIndex) {
+function generateNewPuzzleSync(difficultyIndex) {
   let board = Array.from({ length: 9 }, () => Array(9).fill(0));
-  solveBoard(board);
-  currentSolution = board.map((row) => [...row]);
+  solveBoardSync(board);
+  const solution = board.map((row) => [...row]);
   let targetClues = diffTargets[difficultyIndex];
   let cellsToHide = 81 - targetClues;
   let coords = [];
@@ -177,20 +182,91 @@ function generateNewPuzzle(difficultyIndex) {
       coords.push([r, c]);
     }
   }
-  coords = shuffleArray(coords);
+  coords = shuffleArraySync(coords);
   for (let i = 0; i < coords.length; i++) {
     if (cellsToHide <= 0) break;
     let [r, c] = coords[i];
     let backup = board[r][c];
     board[r][c] = 0;
     let boardCopy = board.map((row) => [...row]);
-    if (countSolutions(boardCopy) !== 1) {
+    if (countSolutionsSync(boardCopy) !== 1) {
       board[r][c] = backup;
     } else {
       cellsToHide--;
     }
   }
-  currentPuzzle = board;
+  return { puzzle: board, solution };
+}
+
+// --- BACKGROUND GENERATION (Web Worker with sync fallback) ---
+let sudokuWorker = null;
+let workerAvailable = typeof Worker !== "undefined";
+let generationRequestId = 0;
+
+function getSudokuWorker() {
+  if (!workerAvailable) return null;
+  if (!sudokuWorker) {
+    try {
+      sudokuWorker = new Worker("sudoku-worker.js");
+    } catch (e) {
+      // e.g. blocked under file:// in some browsers - fall back gracefully
+      workerAvailable = false;
+      return null;
+    }
+  }
+  return sudokuWorker;
+}
+
+function generatePuzzleViaWorker(difficultyIndex) {
+  return new Promise((resolve, reject) => {
+    const worker = getSudokuWorker();
+    if (!worker) {
+      reject(new Error("Worker unavailable"));
+      return;
+    }
+
+    const requestId = ++generationRequestId;
+    const timeoutId = setTimeout(() => {
+      worker.removeEventListener("message", onMessage);
+      reject(new Error("Worker timed out"));
+    }, 8000);
+
+    function onMessage(e) {
+      if (!e.data || e.data.requestId !== requestId) return;
+      clearTimeout(timeoutId);
+      worker.removeEventListener("message", onMessage);
+      if (e.data.error) {
+        reject(new Error(e.data.error));
+      } else {
+        resolve({ puzzle: e.data.puzzle, solution: e.data.solution });
+      }
+    }
+
+    worker.addEventListener("message", onMessage);
+    worker.onerror = () => {
+      clearTimeout(timeoutId);
+      worker.removeEventListener("message", onMessage);
+      workerAvailable = false;
+      reject(new Error("Worker error"));
+    };
+    worker.postMessage({ difficultyIndex, diffTargets, requestId });
+  });
+}
+
+// Generates a puzzle for the given difficulty and stores it in
+// currentPuzzle/currentSolution. Tries the Web Worker first (keeps the UI
+// thread free even for Expert boards); if that's unavailable or fails, it
+// falls back to generating synchronously so the game still works.
+async function generateBoardAsync(difficultyIndex) {
+  try {
+    const { puzzle, solution } = await generatePuzzleViaWorker(difficultyIndex);
+    currentPuzzle = puzzle;
+    currentSolution = solution;
+  } catch (e) {
+    const { puzzle, solution } = generateNewPuzzleSync(difficultyIndex);
+    currentPuzzle = puzzle;
+    currentSolution = solution;
+  }
 }
 
 // --- MODALS UI LOGIC ---
@@ -198,6 +274,18 @@ document.querySelectorAll(".close-modal").forEach((btn) => {
   btn.addEventListener("click", function () {
     const targetId = this.getAttribute("data-target");
     document.getElementById(targetId).classList.add("hidden");
+  });
+});
+
+function closeAllModals() {
+  document.querySelectorAll(".modal").forEach((m) => m.classList.add("hidden"));
+}
+
+// Click on the dark overlay (outside the modal card) closes it, same as the
+// close-x / Escape key. Only fires when the click target IS the overlay.
+document.querySelectorAll(".modal").forEach((modal) => {
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
   });
 });
 
@@ -235,22 +323,45 @@ function applyPencilButtonState() {
   if (isPencilMode) {
     pencilBtn.classList.add("active");
     pencilBtn.classList.remove("secondary");
+    pencilBtn.setAttribute("aria-pressed", "true");
     pencilBtn.innerHTML = `<span style="font-size: 20px;"><img src="Icons/pen-solid-full.svg" alt="" height="20px" width="20px"/></span> Pencil Mode: ON`;
   } else {
     pencilBtn.classList.remove("active");
     pencilBtn.classList.add("secondary");
+    pencilBtn.setAttribute("aria-pressed", "false");
     pencilBtn.innerHTML = `<span style="font-size: 20px;"><img src="Icons/pen-solid-full.svg" alt="" height="20px" width="20px"/></span> Pencil Mode: OFF`;
   }
 }
-pencilBtn.addEventListener("click", () => {
+function togglePencilMode() {
   isPencilMode = !isPencilMode;
   applyPencilButtonState();
   localStorage.setItem("sudoku-pencil-mode", isPencilMode);
+}
+pencilBtn.addEventListener("click", togglePencilMode);
+
+// --- AI BOT HOVER ANIMATION LOGIC ---
+const aiNavBtn = document.getElementById("nav-ai-btn");
+const aiBotIcon = document.getElementById("ai-bot-icon");
+
+// Define your two image paths
+const staticBotSrc = "Icons/icons8-bot-static.png";
+const animatedBotSrc = "Icons/icons8-bot.gif";
+
+aiNavBtn.addEventListener("mouseenter", () => {
+  // Adding a timestamp prevents the browser from loading a "frozen" cached version
+  // of the GIF, forcing the animation to restart from the beginning every time you hover!
+  aiBotIcon.src = animatedBotSrc + "?t=" + new Date().getTime();
+});
+
+aiNavBtn.addEventListener("mouseleave", () => {
+  // Swap back to the static resting frame when the mouse leaves
+  aiBotIcon.src = staticBotSrc;
 });
 
 // --- PERSISTED SETTINGS ---
-// Restores dark mode, highlight toggle, and pencil mode from a previous visit
-// so a first-time player who sets these up doesn't have to redo them every time.
+// Restores dark mode, highlight toggle, pencil mode, and last-used
+// difficulty from a previous visit so returning players don't have to redo
+// their setup every time.
 function loadPersistedSettings() {
   const savedDark = localStorage.getItem("sudoku-dark-mode");
   if (savedDark === "true") {
@@ -268,6 +379,15 @@ function loadPersistedSettings() {
   if (savedPencil === "true") {
     isPencilMode = true;
     applyPencilButtonState();
+  }
+
+  const savedDiff = localStorage.getItem("sudoku-difficulty");
+  if (savedDiff !== null) {
+    const idx = diffModes.indexOf(savedDiff);
+    if (idx !== -1) {
+      activeDiffIndex = idx;
+      selectedDiffIndex = idx;
+    }
   }
 }
 
@@ -320,6 +440,7 @@ document.getElementById("diff-next").addEventListener("click", () => {
 });
 document.getElementById("diff-start").addEventListener("click", () => {
   activeDiffIndex = selectedDiffIndex;
+  localStorage.setItem("sudoku-difficulty", diffModes[activeDiffIndex]);
   document.getElementById("difficulty-modal").classList.add("hidden");
   startNewGame();
 });
@@ -449,8 +570,6 @@ function redoLastMove() {
   checkBoard();
 }
 
-// ... (Keep all your state variables, backtracking algorithm, and modal logic at the top exactly the same) ...
-
 function updateHighlights(num) {
   activeHighlightNumber = num;
 
@@ -461,9 +580,10 @@ function updateHighlights(num) {
   document
     .querySelectorAll(".note")
     .forEach((note) => note.classList.remove("highlight-circle"));
-  document
-    .querySelectorAll(".numpad-btn")
-    .forEach((btn) => btn.classList.remove("highlight-active"));
+  document.querySelectorAll(".numpad-btn").forEach((btn) => {
+    btn.classList.remove("highlight-active");
+    btn.setAttribute("aria-pressed", "false");
+  });
 
   if (!isHighlightEnabled || !num || num === "X") return;
 
@@ -477,9 +597,12 @@ function updateHighlights(num) {
     if (note.dataset.noteVal === num) note.classList.add("highlight-circle");
   });
 
-  // NEW: Highlight the numpad button itself
+  // Highlight the numpad button itself
   document.querySelectorAll(".numpad-btn").forEach((btn) => {
-    if (btn.dataset.val === num) btn.classList.add("highlight-active");
+    if (btn.dataset.val === num) {
+      btn.classList.add("highlight-active");
+      btn.setAttribute("aria-pressed", "true");
+    }
   });
 }
 
@@ -563,63 +686,86 @@ function checkBoard() {
   }
 }
 
-function startNewGame() {
+// Disables the nav buttons that would otherwise let a player kick off a
+// second, overlapping puzzle generation while one is already in flight.
+function setGenerationControlsDisabled(disabled) {
+  ["nav-new-btn", "nav-restart-btn", "diff-start"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = disabled;
+  });
+}
+
+async function startNewGame() {
   boardElement.innerHTML = "";
+  message.style.color = "";
   message.innerText = "Generating Board...";
-  setTimeout(() => {
-    selectedCell = null;
-    moveHistory = [];
-    redoStack = [];
-    updateHighlights(null);
-    generateNewPuzzle(activeDiffIndex);
-    startTimer();
-    refreshBestTimeDisplay();
-    message.innerText = "";
-    resetAiTutorState();
-    resetHintsForNewGame();
-    clearAiChatLog();
+  document.body.classList.add("generating");
+  setGenerationControlsDisabled(true);
 
-    for (let row = 0; row < 9; row++) {
-      for (let col = 0; col < 9; col++) {
-        const wrapper = document.createElement("div");
-        wrapper.classList.add("cell-wrapper");
-        const cell = document.createElement("div");
-        cell.classList.add("cell");
-        cell.dataset.row = row;
-        cell.dataset.col = col;
-        cell.dataset.val = "";
-        cell.dataset.notes = "";
+  selectedCell = null;
+  moveHistory = [];
+  redoStack = [];
+  updateHighlights(null);
 
-        let val = currentPuzzle[row][col];
-        if (val !== 0) {
-          cell.dataset.val = val.toString();
-          cell.classList.add("fixed");
-          cell.dataset.fixed = "true";
-        } else {
-          cell.dataset.fixed = "false";
-        }
+  // Yield one frame so "Generating Board..." actually paints before we kick
+  // off generation (which, via the worker, no longer blocks this thread -
+  // but we still want the message visible immediately either way).
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
-        updateCellDisplay(cell);
+  await generateBoardAsync(activeDiffIndex);
 
-        // FIXED KEYBOARD NAV: We now allow fixed cells to become selectedCell!
-        cell.addEventListener("click", function () {
-          document
-            .querySelectorAll(".cell")
-            .forEach((c) => c.classList.remove("selected"));
+  startTimer();
+  refreshBestTimeDisplay();
+  message.innerText = "";
+  resetAiTutorState();
+  resetHintsForNewGame();
+  clearAiChatLog();
 
-          this.classList.add("selected");
-          selectedCell = this;
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      const wrapper = document.createElement("div");
+      wrapper.classList.add("cell-wrapper");
+      const cell = document.createElement("div");
+      cell.classList.add("cell");
+      cell.dataset.row = row;
+      cell.dataset.col = col;
+      cell.dataset.val = "";
+      cell.dataset.notes = "";
+      cell.setAttribute("role", "gridcell");
+      cell.setAttribute("tabindex", "-1");
 
-          if (this.dataset.val) updateHighlights(this.dataset.val);
-          else updateHighlights(null);
-        });
-
-        wrapper.appendChild(cell);
-        boardElement.appendChild(wrapper);
+      let val = currentPuzzle[row][col];
+      if (val !== 0) {
+        cell.dataset.val = val.toString();
+        cell.classList.add("fixed");
+        cell.dataset.fixed = "true";
+      } else {
+        cell.dataset.fixed = "false";
       }
+
+      updateCellDisplay(cell);
+
+      // Fixed cells can still become selectedCell (needed for keyboard nav).
+      cell.addEventListener("click", function () {
+        document
+          .querySelectorAll(".cell")
+          .forEach((c) => c.classList.remove("selected"));
+
+        this.classList.add("selected");
+        selectedCell = this;
+
+        if (this.dataset.val) updateHighlights(this.dataset.val);
+        else updateHighlights(null);
+      });
+
+      wrapper.appendChild(cell);
+      boardElement.appendChild(wrapper);
     }
-    updateCounts();
-  }, 50);
+  }
+  updateCounts();
+
+  document.body.classList.remove("generating");
+  setGenerationControlsDisabled(false);
 }
 
 // --- AUTO-REMOVE NOTES LOGIC ---
@@ -708,7 +854,53 @@ document.querySelectorAll(".numpad-btn").forEach((btn) => {
   });
 });
 
+// True whenever any modal (Tools, Hint, Difficulty, Confirm, Settings, AI
+// Tutor, etc.) is currently visible.
+function isAnyModalOpen() {
+  return Array.from(document.querySelectorAll(".modal")).some(
+    (m) => !m.classList.contains("hidden"),
+  );
+}
+
 document.addEventListener("keydown", (e) => {
+  // Escape always closes any open modal, even while typing in the AI chat
+  // box - it should never take two presses (blur, then close).
+  if (e.key === "Escape") {
+    if (e.target && e.target.blur) e.target.blur();
+    closeAllModals();
+    return;
+  }
+
+  // Don't hijack keystrokes while the user is typing in a text field (e.g.
+  // the AI Tutor chat box). "1"-"9", arrows, "p", etc. should just type
+  // normally there instead of moving the board cursor or toggling modes.
+  const targetTag = e.target && e.target.tagName;
+  if (
+    targetTag === "INPUT" ||
+    targetTag === "TEXTAREA" ||
+    (e.target && e.target.isContentEditable)
+  ) {
+    return;
+  }
+
+  // Board shortcuts (number entry, arrow navigation, pencil toggle,
+  // undo/redo) are only "live" when no modal is open at all - not just when
+  // no text field is focused. Otherwise, opening e.g. the AI Tutor and
+  // pressing a number key before ever clicking into its chat box would
+  // silently edit or highlight the board sitting behind the modal.
+  if (isAnyModalOpen()) return;
+
+  // Quick toggle for Pencil Mode from the keyboard.
+  if (
+    (e.key === "p" || e.key === "P") &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey
+  ) {
+    togglePencilMode();
+    return;
+  }
+
   if (e.key >= "1" && e.key <= "9") {
     enterNumber(e.key);
   } else if (e.key === "Backspace" || e.key === "Delete") {
@@ -832,7 +1024,7 @@ document.getElementById("tool-hint").addEventListener("click", () => {
     const cands = candidatesFor(r, c);
     if (cands.length === 1) {
       chosenCell = cell;
-      explanation = `This square only has one number left that fits: ${cands[0]}. Every other number 1-9 already appears somewhere in its row, column, or 3x3 box.`;
+      explanation = `This square only has one number left that fits. Every other number 1-9 already appears somewhere in its row, column, or 3x3 box.`;
       break;
     }
   }
@@ -964,7 +1156,7 @@ document.getElementById("hint-reveal-btn").addEventListener("click", () => {
   hintTargetValue = null;
 });
 
-// NEW: Auto Notes Logic
+// Auto Notes Logic
 function runAutoNotes() {
   // 1. Take snapshot for Undo
   moveHistory.push(getBoardSnapshot());
@@ -1596,6 +1788,8 @@ if (aiChatInput) {
       handleAiChatInput(aiChatInput.value);
       aiChatInput.value = "";
     }
+    // Let Escape bubble up to the document-level handler (closes the modal)
+    // rather than doing nothing inside the input.
   });
 }
 
