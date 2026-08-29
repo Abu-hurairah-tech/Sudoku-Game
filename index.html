@@ -60,6 +60,10 @@
             width="30px"
           />
         </button>
+        <div class="sidebar-spacer"></div>
+        <button id="nav-ai-btn" class="ai-nav-btn" title="AI Tutor">
+          <span class="ai-nav-icon" aria-hidden="true">✨</span>
+        </button>
       </nav>
 
       <!-- Main Content Area -->
@@ -251,6 +255,35 @@
             <input type="checkbox" id="dark-mode-toggle" />
             <span class="slider round"></span>
           </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Tutor Modal -->
+    <div id="ai-tutor-modal" class="modal hidden">
+      <div class="modal-content ai-tutor-content">
+        <span class="close-x close-modal" data-target="ai-tutor-modal"
+          >&times;</span
+        >
+        <h2>✨ AI Tutor</h2>
+
+        <div id="ai-chat-log" class="ai-chat-log"></div>
+
+        <div class="ai-quick-actions">
+          <button id="ai-action-hint" class="menu-btn">Give me a hint</button>
+          <button id="ai-action-check" class="menu-btn secondary">
+            Check my board
+          </button>
+        </div>
+
+        <div class="ai-input-row">
+          <input
+            type="text"
+            id="ai-chat-input"
+            placeholder="Ask the AI tutor..."
+            autocomplete="off"
+          />
+          <button id="ai-chat-send" class="menu-btn ai-send-btn">Send</button>
         </div>
       </div>
     </div>

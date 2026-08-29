@@ -323,6 +323,7 @@ function restartCurrentGame() {
   updateCounts();
   message.innerText = "";
   startTimer();
+  resetAiTutorState();
 }
 
 function undoLastMove() {
@@ -487,6 +488,8 @@ function startNewGame() {
     startTimer();
     refreshBestTimeDisplay();
     message.innerText = "";
+    resetAiTutorState();
+    clearAiChatLog();
 
     for (let row = 0; row < 9; row++) {
       for (let col = 0; col < 9; col++) {
@@ -867,7 +870,7 @@ document.getElementById("hint-reveal-btn").addEventListener("click", () => {
 });
 
 // NEW: Auto Notes Logic
-document.getElementById("tool-notes").addEventListener("click", () => {
+function runAutoNotes() {
   // 1. Take snapshot for Undo
   moveHistory.push(getBoardSnapshot());
   redoStack = [];
@@ -907,9 +910,569 @@ document.getElementById("tool-notes").addEventListener("click", () => {
       updateCellDisplay(cell);
     }
   });
+}
 
-  // Close the menu
+document.getElementById("tool-notes").addEventListener("click", () => {
+  runAutoNotes();
   document.getElementById("tools-modal").classList.add("hidden");
+});
+
+// =========================================================
+// AI TUTOR
+// Rule-based coaching engine that reads the live board and walks the
+// player through progressively stronger solving techniques - Naked
+// Singles, Hidden Singles, then Naked Pairs - via a tiered, chat-style
+// panel rather than instantly spoiling the answer.
+// =========================================================
+
+const aiChatLog = document.getElementById("ai-chat-log");
+const aiActionHintBtn = document.getElementById("ai-action-hint");
+const aiActionCheckBtn = document.getElementById("ai-action-check");
+const aiChatInput = document.getElementById("ai-chat-input");
+const aiChatSendBtn = document.getElementById("ai-chat-send");
+
+// stage: 0 = no active hint, 1 = area shown, 2 = technique shown, 3 = resolved
+let aiTutorState = {
+  stage: 0,
+  technique: null,
+  cell: null,
+  value: null,
+  areaCells: [],
+  pairCells: [],
+  pairValues: null,
+  affected: [],
+};
+
+function resetAiTutorState() {
+  clearAiAreaHighlights();
+  aiTutorState = {
+    stage: 0,
+    technique: null,
+    cell: null,
+    value: null,
+    areaCells: [],
+    pairCells: [],
+    pairValues: null,
+    affected: [],
+  };
+  if (aiActionHintBtn) aiActionHintBtn.innerText = "Give me a hint";
+}
+
+function clearAiAreaHighlights() {
+  document
+    .querySelectorAll(".ai-area-highlight")
+    .forEach((c) => c.classList.remove("ai-area-highlight"));
+  document
+    .querySelectorAll(".ai-target-highlight")
+    .forEach((c) => c.classList.remove("ai-target-highlight"));
+}
+
+function clearAiChatLog() {
+  if (aiChatLog) aiChatLog.innerHTML = "";
+}
+
+function addAiMessage(text, sender) {
+  if (!aiChatLog) return;
+  const bubble = document.createElement("div");
+  bubble.classList.add("ai-msg", sender === "user" ? "user" : "ai");
+  bubble.innerText = text;
+  aiChatLog.appendChild(bubble);
+  aiChatLog.scrollTop = aiChatLog.scrollHeight;
+}
+
+// --- Board helpers for the tutor engine ---
+function getCellEl(r, c) {
+  return document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+}
+
+function getConstraintBoardAndEmpties() {
+  let board = Array.from({ length: 9 }, () => Array(9).fill(0));
+  let emptyCells = [];
+  document.querySelectorAll(".cell").forEach((cell) => {
+    const r = parseInt(cell.dataset.row);
+    const c = parseInt(cell.dataset.col);
+    if (
+      cell.dataset.val !== "" &&
+      parseInt(cell.dataset.val) === currentSolution[r][c]
+    ) {
+      board[r][c] = parseInt(cell.dataset.val);
+    }
+    if (cell.dataset.val === "") emptyCells.push(cell);
+  });
+  return { board, emptyCells };
+}
+
+function candidatesForCell(board, r, c) {
+  let cands = [];
+  for (let n = 1; n <= 9; n++) {
+    if (isSafe(board, r, c, n)) cands.push(n);
+  }
+  return cands;
+}
+
+function getRowCells(r) {
+  let cells = [];
+  for (let c = 0; c < 9; c++) cells.push(getCellEl(r, c));
+  return cells;
+}
+function getColCells(c) {
+  let cells = [];
+  for (let r = 0; r < 9; r++) cells.push(getCellEl(r, c));
+  return cells;
+}
+function getBoxCells(startRow, startCol) {
+  let cells = [];
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      cells.push(getCellEl(startRow + i, startCol + j));
+    }
+  }
+  return cells;
+}
+
+function getAllUnits() {
+  const units = [];
+  for (let r = 0; r < 9; r++)
+    units.push({ type: "row", label: `row ${r + 1}`, cells: getRowCells(r) });
+  for (let c = 0; c < 9; c++)
+    units.push({
+      type: "column",
+      label: `column ${c + 1}`,
+      cells: getColCells(c),
+    });
+  for (let br = 0; br < 3; br++) {
+    for (let bc = 0; bc < 3; bc++) {
+      units.push({
+        type: "box",
+        label: "3x3 box",
+        cells: getBoxCells(br * 3, bc * 3),
+      });
+    }
+  }
+  return units;
+}
+
+// --- Level 1: Naked Single ---
+function findNakedSingle(board, emptyCells) {
+  for (const cell of emptyCells) {
+    const r = parseInt(cell.dataset.row);
+    const c = parseInt(cell.dataset.col);
+    const cands = candidatesForCell(board, r, c);
+    if (cands.length === 1) {
+      return {
+        technique: "Naked Single",
+        cell,
+        value: cands[0].toString(),
+        areaType: "cell",
+        areaLabel: `Row ${r + 1}, Column ${c + 1}`,
+        areaCells: [cell],
+        techniqueMsg: `This square has only one candidate left: ${cands[0]}. Every other digit 1-9 is already blocked by its row, column, or box.`,
+        revealMsg: `Row ${r + 1}, Column ${c + 1} must be ${cands[0]}.`,
+      };
+    }
+  }
+  return null;
+}
+
+// --- Level 2: Hidden Single ---
+function findHiddenSingle(board, emptyCells) {
+  for (const cell of emptyCells) {
+    const r = parseInt(cell.dataset.row);
+    const c = parseInt(cell.dataset.col);
+    const cands = candidatesForCell(board, r, c);
+
+    for (const n of cands) {
+      // Row
+      let onlyInRow = true;
+      for (let cc = 0; cc < 9 && onlyInRow; cc++) {
+        if (cc === c || board[r][cc] !== 0) continue;
+        if (candidatesForCell(board, r, cc).includes(n)) onlyInRow = false;
+      }
+      if (onlyInRow) {
+        return {
+          technique: "Hidden Single",
+          cell,
+          value: n.toString(),
+          areaType: "row",
+          areaLabel: `Row ${r + 1}`,
+          areaCells: getRowCells(r),
+          techniqueMsg: `Somewhere in row ${r + 1}, the number ${n} can only go in one square - it's already ruled out everywhere else in the row.`,
+          revealMsg: `In row ${r + 1}, ${n} can only fit at Column ${c + 1}.`,
+        };
+      }
+
+      // Column
+      let onlyInCol = true;
+      for (let rr = 0; rr < 9 && onlyInCol; rr++) {
+        if (rr === r || board[rr][c] !== 0) continue;
+        if (candidatesForCell(board, rr, c).includes(n)) onlyInCol = false;
+      }
+      if (onlyInCol) {
+        return {
+          technique: "Hidden Single",
+          cell,
+          value: n.toString(),
+          areaType: "column",
+          areaLabel: `Column ${c + 1}`,
+          areaCells: getColCells(c),
+          techniqueMsg: `Somewhere in column ${c + 1}, the number ${n} can only go in one square - it's already ruled out everywhere else in the column.`,
+          revealMsg: `In column ${c + 1}, ${n} can only fit at Row ${r + 1}.`,
+        };
+      }
+
+      // Box
+      let br = Math.floor(r / 3) * 3;
+      let bc = Math.floor(c / 3) * 3;
+      let onlyInBox = true;
+      for (let i = 0; i < 3 && onlyInBox; i++) {
+        for (let j = 0; j < 3 && onlyInBox; j++) {
+          let rr = br + i,
+            cc = bc + j;
+          if ((rr === r && cc === c) || board[rr][cc] !== 0) continue;
+          if (candidatesForCell(board, rr, cc).includes(n)) onlyInBox = false;
+        }
+      }
+      if (onlyInBox) {
+        return {
+          technique: "Hidden Single",
+          cell,
+          value: n.toString(),
+          areaType: "box",
+          areaLabel: "This 3x3 box",
+          areaCells: getBoxCells(br, bc),
+          techniqueMsg: `Inside this 3x3 box, the number ${n} can only go in one square, even though that square still has other candidates too.`,
+          revealMsg: `In this box, ${n} can only fit at Row ${r + 1}, Column ${c + 1}.`,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+// --- Level 3: Naked Pair (elimination technique, doesn't fill a value) ---
+function findNakedPair(board, emptyCells) {
+  const units = getAllUnits();
+  for (const unit of units) {
+    const emptyInUnit = unit.cells.filter((c) => c.dataset.val === "");
+    const candMap = emptyInUnit.map((c) => ({
+      cell: c,
+      cands: candidatesForCell(
+        board,
+        parseInt(c.dataset.row),
+        parseInt(c.dataset.col),
+      ),
+    }));
+
+    for (let i = 0; i < candMap.length; i++) {
+      if (candMap[i].cands.length !== 2) continue;
+      for (let j = i + 1; j < candMap.length; j++) {
+        if (candMap[j].cands.length !== 2) continue;
+        if (
+          candMap[i].cands[0] === candMap[j].cands[0] &&
+          candMap[i].cands[1] === candMap[j].cands[1]
+        ) {
+          const [a, b] = candMap[i].cands;
+          const affected = candMap
+            .filter(
+              (entry) =>
+                entry.cell !== candMap[i].cell &&
+                entry.cell !== candMap[j].cell &&
+                (entry.cands.includes(a) || entry.cands.includes(b)),
+            )
+            .map((entry) => entry.cell);
+
+          if (affected.length > 0) {
+            return {
+              technique: "Naked Pair",
+              pairCells: [candMap[i].cell, candMap[j].cell],
+              pairValues: [a, b],
+              affected,
+              areaType: unit.type,
+              areaLabel:
+                unit.label.charAt(0).toUpperCase() + unit.label.slice(1),
+              areaCells: unit.cells,
+              techniqueMsg: `Two squares in this ${unit.type} can only be ${a} or ${b}. Since those two digits are locked to those two squares, ${a} and ${b} can be erased from every other square's notes in that ${unit.type}.`,
+              revealMsg: `Erasing the pencil marks ${a} and ${b} from the other empty squares in this ${unit.type}.`,
+            };
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function runAiAnalysis() {
+  const { board, emptyCells } = getConstraintBoardAndEmpties();
+  if (emptyCells.length === 0) return { technique: "Complete" };
+
+  return (
+    findNakedSingle(board, emptyCells) ||
+    findHiddenSingle(board, emptyCells) ||
+    findNakedPair(board, emptyCells) || {
+      technique: "Advanced",
+      cell: emptyCells[Math.floor(Math.random() * emptyCells.length)],
+      areaType: "cell",
+    }
+  );
+}
+
+function applyAiAreaHighlight(result) {
+  clearAiAreaHighlights();
+  const cells =
+    result.areaType === "cell" ? result.areaCells : result.areaCells;
+  cells.forEach((c) => c && c.classList.add("ai-area-highlight"));
+}
+
+function applyAiTargetHighlight(result) {
+  clearAiAreaHighlights();
+  if (result.technique === "Naked Pair") {
+    result.pairCells.forEach((c) => c.classList.add("ai-target-highlight"));
+    result.affected.forEach((c) => c.classList.add("ai-area-highlight"));
+  } else if (result.cell) {
+    result.cell.classList.add("ai-target-highlight");
+  }
+}
+
+function scrollToAiCell(result) {
+  const target =
+    result.technique === "Naked Pair" ? result.pairCells[0] : result.cell;
+  if (target) {
+    target.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+      inline: "center",
+    });
+  }
+}
+
+// Advances the tiered hint: area nudge -> technique nudge -> full reveal.
+function advanceAiHint() {
+  // If we have an active, still-valid hint in progress, advance it.
+  const stillValid =
+    aiTutorState.stage > 0 &&
+    aiTutorState.stage < 3 &&
+    (aiTutorState.technique === "Naked Pair"
+      ? aiTutorState.pairCells.every((c) => c.dataset.val === "")
+      : aiTutorState.cell && aiTutorState.cell.dataset.val === "");
+
+  if (!stillValid && aiTutorState.stage !== 0) {
+    resetAiTutorState();
+  }
+
+  if (aiTutorState.stage === 0) {
+    const result = runAiAnalysis();
+
+    if (result.technique === "Complete") {
+      addAiMessage("The board is already full - nice work! 🎉", "ai");
+      return;
+    }
+
+    if (result.technique === "Advanced") {
+      addAiMessage(
+        "This position needs a more advanced technique than I can explain simply. Want me to just fill in a square for you?",
+        "ai",
+      );
+      aiTutorState = {
+        ...aiTutorState,
+        stage: 2,
+        technique: "Advanced",
+        cell: result.cell,
+      };
+      applyAiTargetHighlight({ technique: "Advanced", cell: result.cell });
+      scrollToAiCell({ technique: "Advanced", cell: result.cell });
+      aiActionHintBtn.innerText = "Just fill it in";
+      return;
+    }
+
+    aiTutorState = { stage: 1, ...result };
+    applyAiAreaHighlight(result);
+    scrollToAiCell(result);
+    addAiMessage(
+      `Let's take a closer look at ${result.areaLabel.toLowerCase()}.`,
+      "ai",
+    );
+    aiActionHintBtn.innerText =
+      result.technique === "Naked Pair" ? "What's the trick?" : "Tell me more";
+    return;
+  }
+
+  if (aiTutorState.stage === 1) {
+    addAiMessage(aiTutorState.techniqueMsg, "ai");
+    aiTutorState.stage = 2;
+    aiActionHintBtn.innerText =
+      aiTutorState.technique === "Naked Pair"
+        ? "Apply it for me"
+        : "Show me the answer";
+    return;
+  }
+
+  if (aiTutorState.stage === 2) {
+    if (aiTutorState.technique === "Advanced") {
+      revealFallbackCell(aiTutorState.cell);
+    } else if (aiTutorState.technique === "Naked Pair") {
+      applyNakedPairElimination(aiTutorState);
+    } else {
+      revealAiFill(aiTutorState.cell, aiTutorState.value);
+    }
+    addAiMessage(aiTutorState.revealMsg || "Done!", "ai");
+    resetAiTutorState();
+  }
+}
+
+function revealAiFill(cell, value) {
+  moveHistory.push(getBoardSnapshot());
+  redoStack = [];
+
+  cell.dataset.val = value;
+  cell.dataset.notes = "";
+  cell.classList.remove("error-highlight");
+  cell.dataset.fixed = "true";
+  cell.classList.add("fixed");
+  updateCellDisplay(cell);
+
+  removeNotesFromPeers(cell.dataset.row, cell.dataset.col, value);
+
+  cell.classList.add("ai-reveal-flash");
+  setTimeout(() => cell.classList.remove("ai-reveal-flash"), 3000);
+
+  updateCounts();
+  checkBoard();
+}
+
+function revealFallbackCell(cell) {
+  const r = parseInt(cell.dataset.row);
+  const c = parseInt(cell.dataset.col);
+  const value = currentSolution[r][c].toString();
+  revealAiFill(cell, value);
+}
+
+function applyNakedPairElimination(state) {
+  const [a, b] = state.pairValues.map((n) => n.toString());
+  let anyChanged = false;
+  moveHistory.push(getBoardSnapshot());
+  redoStack = [];
+
+  state.affected.forEach((cell) => {
+    if (!cell.dataset.notes) return;
+    let notesArray = cell.dataset.notes.split(",").filter((n) => n !== "");
+    const before = notesArray.length;
+    notesArray = notesArray.filter((n) => n !== a && n !== b);
+    if (notesArray.length !== before) {
+      anyChanged = true;
+      cell.dataset.notes = notesArray.join(",");
+      updateCellDisplay(cell);
+    }
+  });
+
+  if (!anyChanged) {
+    // No pencil marks were present to clean up - just leave the reasoning
+    // on screen without editing the board.
+    redoStack = [];
+    moveHistory.pop();
+  }
+
+  state.affected.forEach((c) => c.classList.add("ai-reveal-flash"));
+  setTimeout(() => {
+    state.affected.forEach((c) => c.classList.remove("ai-reveal-flash"));
+  }, 3000);
+}
+
+function runAiCheckBoard() {
+  let errorCount = 0;
+  let filledCount = 0;
+  document.querySelectorAll(".cell").forEach((cell) => {
+    if (cell.dataset.val !== "" && cell.dataset.fixed === "false") {
+      filledCount++;
+      const r = cell.dataset.row;
+      const c = cell.dataset.col;
+      const expectedValue = currentSolution[r][c].toString();
+      if (cell.dataset.val !== expectedValue) {
+        cell.classList.add("error-highlight");
+        errorCount++;
+      } else {
+        cell.classList.remove("error-highlight");
+      }
+    }
+  });
+
+  if (filledCount === 0) {
+    addAiMessage(
+      "You haven't filled anything in yet - go ahead and place a few numbers, then I'll check them.",
+      "ai",
+    );
+  } else if (errorCount === 0) {
+    addAiMessage(
+      "Everything you've filled in so far is correct. Keep going! ✅",
+      "ai",
+    );
+  } else {
+    addAiMessage(
+      `I found ${errorCount} incorrect square${errorCount === 1 ? "" : "s"} - highlighted in red on the board.`,
+      "ai",
+    );
+  }
+}
+
+function handleAiChatInput(rawText) {
+  const text = rawText.trim();
+  if (!text) return;
+  addAiMessage(text, "user");
+
+  const lower = text.toLowerCase();
+
+  if (/(hint|stuck|help|clue|next step)/.test(lower)) {
+    advanceAiHint();
+  } else if (/(check|valid|correct|mistake|error)/.test(lower)) {
+    runAiCheckBoard();
+  } else if (/(note|pencil|candidate)/.test(lower)) {
+    runAutoNotes();
+    addAiMessage(
+      "Done - I've filled in the pencil-mark candidates for every empty square.",
+      "ai",
+    );
+  } else if (/(thank|thanks)/.test(lower)) {
+    addAiMessage("Anytime - good luck with the rest of the board!", "ai");
+  } else {
+    addAiMessage(
+      "I can give you a hint, check your board for mistakes, or fill in pencil marks. Just ask, or use the buttons below.",
+      "ai",
+    );
+  }
+}
+
+if (aiActionHintBtn) {
+  aiActionHintBtn.addEventListener("click", advanceAiHint);
+}
+if (aiActionCheckBtn) {
+  aiActionCheckBtn.addEventListener("click", () => {
+    addAiMessage("Check my board", "user");
+    runAiCheckBoard();
+  });
+}
+if (aiChatSendBtn) {
+  aiChatSendBtn.addEventListener("click", () => {
+    handleAiChatInput(aiChatInput.value);
+    aiChatInput.value = "";
+  });
+}
+if (aiChatInput) {
+  aiChatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      handleAiChatInput(aiChatInput.value);
+      aiChatInput.value = "";
+    }
+  });
+}
+
+document.getElementById("nav-ai-btn").addEventListener("click", () => {
+  document.getElementById("ai-tutor-modal").classList.remove("hidden");
+  if (aiChatLog && aiChatLog.children.length === 0) {
+    addAiMessage(
+      "Hi! I'm your AI Sudoku tutor. Grab a hint and I'll walk you through the logic step by step, or ask me to check your board for mistakes.",
+      "ai",
+    );
+  }
 });
 
 loadPersistedSettings();

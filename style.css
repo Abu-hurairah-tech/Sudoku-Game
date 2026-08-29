@@ -27,6 +27,12 @@
   --slider-bg: #f5f5f5;
   --note-color: #666;
 
+  /* AI Tutor accent */
+  --ai-accent: #8e24aa;
+  --ai-accent-bg: #f3e5f5;
+  --ai-bubble-ai-bg: #f0e6f6;
+  --ai-bubble-user-bg: #1976d2;
+
   /* Responsive board cell size: shrinks smoothly on narrow screens */
   --cell-size: clamp(30px, 8vw, 50px);
 }
@@ -58,6 +64,11 @@ body.dark-mode {
   --btn-secondary-hover: #555;
   --slider-bg: #2c2c2c;
   --note-color: #aaa;
+
+  --ai-accent: #ce93d8;
+  --ai-accent-bg: #3a1f42;
+  --ai-bubble-ai-bg: #3a2a45;
+  --ai-bubble-user-bg: #1976d2;
 }
 
 /* --- OVERALL LAYOUT --- */
@@ -85,6 +96,7 @@ body {
   flex-direction: column;
   align-items: center;
   padding-top: 20px;
+  padding-bottom: 20px;
   gap: 30px;
   transition: background-color 0.3s;
 }
@@ -105,6 +117,21 @@ body.dark-mode .sidebar button img { filter: invert(1); } /* Makes dark icons wh
 /* Redo icon reuses the undo icon, mirrored */
 .icon-flip { transform: scaleX(-1); }
 .sidebar button:hover .icon-flip { transform: scaleX(-1) scale(1.2); }
+
+/* Pushes the AI Tutor button to the bottom of the sidebar */
+.sidebar-spacer { flex: 1; }
+
+/* AI Tutor sidebar button - visually distinct accent so it reads as "smart" */
+.ai-nav-btn {
+  opacity: 1 !important;
+  border-radius: 50%;
+  background: var(--ai-accent-bg) !important;
+  box-shadow: 0 0 0 1px rgba(142, 36, 170, 0.15);
+}
+.ai-nav-btn:hover {
+  box-shadow: 0 0 12px rgba(142, 36, 170, 0.45);
+}
+.ai-nav-icon { font-size: 22px; line-height: 1; display: block; filter: none; }
 
 /* --- MAIN CONTENT & HEADER --- */
 .main-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -163,6 +190,22 @@ body.dark-mode .sidebar button img { filter: invert(1); } /* Makes dark icons wh
 @keyframes soft-blink {
   0%, 100% { background-color: transparent; }
   50% { background-color: var(--hint-flash-bg); }
+}
+
+/* AI TUTOR BOARD HIGHLIGHTS (distinct purple accent, separate from the
+   orange "matching number" highlight so the two never look ambiguous) */
+.cell.ai-area-highlight {
+  box-shadow: inset 0 0 0 2px var(--ai-accent);
+  background-color: var(--ai-accent-bg);
+}
+.cell.ai-target-highlight {
+  box-shadow: 0 0 0 3px var(--ai-accent);
+  background-color: var(--ai-accent-bg);
+}
+.ai-reveal-flash { animation: ai-soft-blink 1s ease-in-out 3; }
+@keyframes ai-soft-blink {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: var(--ai-accent-bg); }
 }
 
 /* --- NOTES (PENCIL MARKS) GRID --- */
@@ -259,6 +302,95 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 /* =========================================================
+   AI TUTOR PANEL
+   ========================================================= */
+.ai-tutor-content {
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+}
+.ai-tutor-content h2 { color: var(--ai-accent); }
+
+.ai-chat-log {
+  max-height: 260px;
+  min-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 14px;
+  border: 1px solid var(--numpad-border);
+  border-radius: 10px;
+  background-color: var(--bg-color);
+}
+
+.ai-msg {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  word-wrap: break-word;
+}
+.ai-msg.ai {
+  align-self: flex-start;
+  background-color: var(--ai-bubble-ai-bg);
+  color: var(--text-color);
+  border-bottom-left-radius: 4px;
+}
+.ai-msg.user {
+  align-self: flex-end;
+  background-color: var(--ai-bubble-user-bg);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.ai-quick-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.ai-quick-actions .menu-btn {
+  width: auto;
+  flex: 1;
+  font-size: 13px;
+  padding: 10px 6px;
+}
+.ai-quick-actions .menu-btn.ai-primary {
+  background-color: var(--ai-accent);
+}
+.ai-quick-actions .menu-btn.ai-primary:hover {
+  background-color: #6a1b7a;
+}
+
+.ai-input-row {
+  display: flex;
+  gap: 8px;
+}
+#ai-chat-input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--numpad-border);
+  background-color: var(--numpad-bg);
+  color: var(--text-color);
+  font-size: 14px;
+  min-width: 0;
+}
+#ai-chat-input:focus { outline: 2px solid var(--ai-accent); }
+.ai-send-btn {
+  width: auto;
+  padding: 10px 16px;
+  background-color: var(--ai-accent);
+}
+.ai-send-btn:hover { background-color: #6a1b7a; }
+
+@media (max-width: 480px) {
+  .ai-tutor-content { width: 100%; }
+}
+
+/* =========================================================
    RESPONSIVE / MOBILE LAYOUT
    The board previously used fixed 50px cells with no media
    queries, which overflowed or got clipped on phone screens.
@@ -293,6 +425,7 @@ input:checked + .slider:before { transform: translateX(20px); }
     justify-content: center;
     box-shadow: 0 2px 5px rgba(0,0,0,0.08);
   }
+  .sidebar-spacer { flex: 0 0 0; width: 0; }
   .sidebar button { padding: 6px; }
   .sidebar button img { height: 24px; width: 24px; }
 
