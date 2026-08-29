@@ -1,25 +1,19 @@
-// Remove the old baseSolution array. We don't need it anymore!
-
-let currentSolution = []; // Holds the fully solved board (2D Array)
-let currentPuzzle = []; // Holds the board with missing numbers (2D Array)
+let currentSolution = [];
+let currentPuzzle = [];
 let selectedCell = null;
 let moveHistory = [];
 
 // Settings & State
 let isHighlightEnabled = true;
 let activeHighlightNumber = null;
-let isPencilMode = false; // NEW: Tracks pencil toggle
+let isPencilMode = false;
 
-// Difficulty State
 const diffModes = ["Beginner", "Easy", "Hard", "Expert"];
 const diffTargets = [50, 40, 30, 22];
 let activeDiffIndex = 1;
 let selectedDiffIndex = 1;
 
-// Confirmation State
 let pendingConfirmAction = null;
-
-// Timer Variables
 let timerInterval;
 let secondsElapsed = 0;
 const timerElement = document.getElementById("timer");
@@ -146,22 +140,26 @@ document.getElementById("highlight-toggle").addEventListener("change", (e) => {
   updateHighlights(activeHighlightNumber);
 });
 
-// Pencil Mode Toggle Logic
+// NEW: Dark Mode Toggle Logic
+document.getElementById("dark-mode-toggle").addEventListener("change", (e) => {
+  if (e.target.checked) document.body.classList.add("dark-mode");
+  else document.body.classList.remove("dark-mode");
+});
+
 const pencilBtn = document.getElementById("pencil-btn");
 pencilBtn.addEventListener("click", () => {
   isPencilMode = !isPencilMode;
   if (isPencilMode) {
     pencilBtn.classList.add("active");
     pencilBtn.classList.remove("secondary");
-    pencilBtn.innerHTML = `<span style="font-size: 20px;"><img src="Icons/pen-solid-full.svg" alt="" height="20px" width="20px" /></span> Pencil Mode: ON`;
+    pencilBtn.innerHTML = `<span style="font-size: 20px;"><img src="Icons/pen-solid-full.svg" alt="" height="20px" width="20px"/></span> Pencil Mode: ON`;
   } else {
     pencilBtn.classList.remove("active");
     pencilBtn.classList.add("secondary");
-    pencilBtn.innerHTML = `<span style="font-size: 20px;"><img src="Icons/pen-solid-full.svg" alt="" height="20px" width="20px" /></span> Pencil Mode: OFF`;
+    pencilBtn.innerHTML = `<span style="font-size: 20px;"><img src="Icons/pen-solid-full.svg" alt="" height="20px" width="20px"/></span> Pencil Mode: OFF`;
   }
 });
 
-// --- CONFIRMATION MODAL LOGIC ---
 function showConfirmModal(msg, actionFunction) {
   document.getElementById("confirm-message").innerText = msg;
   pendingConfirmAction = actionFunction;
@@ -178,29 +176,24 @@ document.getElementById("confirm-no").addEventListener("click", () => {
   document.getElementById("confirm-modal").classList.add("hidden");
 });
 
-// --- DIFFICULTY SLIDER LOGIC ---
 function updateDiffDisplay() {
   document.getElementById("diff-display").innerText =
     diffModes[selectedDiffIndex];
 }
-
 document.getElementById("diff-prev").addEventListener("click", () => {
   if (selectedDiffIndex > 0) selectedDiffIndex--;
   updateDiffDisplay();
 });
-
 document.getElementById("diff-next").addEventListener("click", () => {
   if (selectedDiffIndex < diffModes.length - 1) selectedDiffIndex++;
   updateDiffDisplay();
 });
-
 document.getElementById("diff-start").addEventListener("click", () => {
   activeDiffIndex = selectedDiffIndex;
   document.getElementById("difficulty-modal").classList.add("hidden");
   startNewGame();
 });
 
-// Sidebar Buttons
 document
   .getElementById("nav-new-btn")
   .addEventListener("click", () =>
@@ -219,38 +212,34 @@ document
   );
 document.getElementById("nav-undo-btn").addEventListener("click", undoLastMove);
 
-// --- STATE MANAGEMENT (SNAPSHOTS FOR UNDO) ---
-// Takes a picture of all 81 cells so we can restore exact notes and numbers
+// --- STATE MANAGEMENT ---
 function getBoardSnapshot() {
   let snapshot = [];
   document.querySelectorAll(".cell").forEach((cell) => {
     snapshot.push({
       val: cell.dataset.val,
       notes: cell.dataset.notes,
+      fixed: cell.dataset.fixed,
     });
   });
   return snapshot;
 }
 
 // --- RENDERING ENGINE ---
-// Updates a single cell's HTML to show either a big number OR the 3x3 notes grid
 function updateCellDisplay(cell) {
-  cell.innerHTML = ""; // Clear existing content
+  cell.innerHTML = "";
   let val = cell.dataset.val;
 
   if (val && val !== "") {
-    // Show Big Number
     const span = document.createElement("span");
     span.classList.add("big-number");
     span.innerText = val;
     cell.appendChild(span);
   } else {
-    // Show Notes Grid
     let notes = cell.dataset.notes ? cell.dataset.notes.split(",") : [];
     if (notes.length > 0) {
       const grid = document.createElement("div");
       grid.classList.add("notes-grid");
-
       for (let i = 1; i <= 9; i++) {
         const noteSpan = document.createElement("span");
         noteSpan.classList.add("note");
@@ -272,11 +261,9 @@ function restartCurrentGame() {
     if (cell.dataset.fixed === "false") {
       cell.dataset.val = "";
       cell.dataset.notes = "";
-      cell.style.color = "#333";
       updateCellDisplay(cell);
     }
   });
-
   moveHistory = [];
   selectedCell = null;
   updateHighlights(null);
@@ -288,20 +275,26 @@ function restartCurrentGame() {
 function undoLastMove() {
   if (moveHistory.length === 0) return;
   const lastSnapshot = moveHistory.pop();
-
-  // Restore all 81 cells to their exact previous state
   document.querySelectorAll(".cell").forEach((cell, index) => {
     let snap = lastSnapshot[index];
     cell.dataset.val = snap.val;
     cell.dataset.notes = snap.notes;
+    // Restore the fixed/locked state too - otherwise undoing a "Get a Hint" move
+    // leaves the cell permanently blank AND locked, since it would still carry
+    // fixed="true" from the hint even after its value is reverted.
+    if (snap.fixed !== undefined) {
+      cell.dataset.fixed = snap.fixed;
+      cell.classList.toggle("fixed", snap.fixed === "true");
+    }
     cell.classList.remove("error-highlight");
     updateCellDisplay(cell);
   });
-
   updateCounts();
   updateHighlights(activeHighlightNumber);
   checkBoard();
 }
+
+// ... (Keep all your state variables, backtracking algorithm, and modal logic at the top exactly the same) ...
 
 function updateHighlights(num) {
   activeHighlightNumber = num;
@@ -313,6 +306,9 @@ function updateHighlights(num) {
   document
     .querySelectorAll(".note")
     .forEach((note) => note.classList.remove("highlight-circle"));
+  document
+    .querySelectorAll(".numpad-btn")
+    .forEach((btn) => btn.classList.remove("highlight-active"));
 
   if (!isHighlightEnabled || !num || num === "X") return;
 
@@ -324,6 +320,11 @@ function updateHighlights(num) {
   // Highlight tiny notes
   document.querySelectorAll(".note").forEach((note) => {
     if (note.dataset.noteVal === num) note.classList.add("highlight-circle");
+  });
+
+  // NEW: Highlight the numpad button itself
+  document.querySelectorAll(".numpad-btn").forEach((btn) => {
+    if (btn.dataset.val === num) btn.classList.add("highlight-active");
   });
 }
 
@@ -369,18 +370,18 @@ function checkBoard() {
     const r = cell.dataset.row;
     const c = cell.dataset.col;
     const expectedValue = currentSolution[r][c].toString();
-
-    if (cell.dataset.val === "") {
-      isComplete = false;
-    } else if (cell.dataset.val !== expectedValue) {
-      isCorrect = false;
-    }
+    if (cell.dataset.val === "") isComplete = false;
+    else if (cell.dataset.val !== expectedValue) isCorrect = false;
   });
 
   if (isComplete && isCorrect) {
     message.innerText = `Congratulations! You solved ${diffModes[activeDiffIndex]} Mode!`;
-    message.style.color = "#2e7d32";
+    message.style.color = "#4caf50";
     stopTimer();
+
+    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+    boardElement.classList.add("board-win-pulse");
+    setTimeout(() => boardElement.classList.remove("board-win-pulse"), 1000);
   } else {
     message.innerText = "";
   }
@@ -389,7 +390,6 @@ function checkBoard() {
 function startNewGame() {
   boardElement.innerHTML = "";
   message.innerText = "Generating Board...";
-
   setTimeout(() => {
     selectedCell = null;
     moveHistory = [];
@@ -402,8 +402,6 @@ function startNewGame() {
       for (let col = 0; col < 9; col++) {
         const wrapper = document.createElement("div");
         wrapper.classList.add("cell-wrapper");
-
-        // CHANGED: From <input> to <div> container
         const cell = document.createElement("div");
         cell.classList.add("cell");
         cell.dataset.row = row;
@@ -420,21 +418,17 @@ function startNewGame() {
           cell.dataset.fixed = "false";
         }
 
-        // Draw initial display (Big Number or Empty)
         updateCellDisplay(cell);
 
+        // FIXED KEYBOARD NAV: We now allow fixed cells to become selectedCell!
         cell.addEventListener("click", function () {
           document
             .querySelectorAll(".cell")
             .forEach((c) => c.classList.remove("selected"));
-          if (this.dataset.fixed === "false") {
-            this.classList.add("selected");
-            selectedCell = this;
-          } else {
-            selectedCell = null;
-          }
 
-          // Highlight the big number if it exists
+          this.classList.add("selected");
+          selectedCell = this;
+
           if (this.dataset.val) updateHighlights(this.dataset.val);
           else updateHighlights(null);
         });
@@ -452,20 +446,16 @@ function removeNotesFromPeers(row, col, numStr) {
   document.querySelectorAll(".cell").forEach((cell) => {
     let r = cell.dataset.row;
     let c = cell.dataset.col;
-
-    // Check if cell is in the same row, col, or 3x3 box
     let sameRow = r === row;
     let sameCol = c === col;
     let sameBox =
       Math.floor(r / 3) === Math.floor(row / 3) &&
       Math.floor(c / 3) === Math.floor(col / 3);
 
-    // Apply only to peers (not the cell itself)
     if ((sameRow || sameCol || sameBox) && !(r === row && c === col)) {
       if (cell.dataset.notes) {
         let notesArray = cell.dataset.notes.split(",");
         if (notesArray.includes(numStr)) {
-          // Filter the number out and save
           notesArray = notesArray.filter((n) => n !== numStr);
           cell.dataset.notes = notesArray.join(",");
           updateCellDisplay(cell);
@@ -475,16 +465,18 @@ function removeNotesFromPeers(row, col, numStr) {
   });
 }
 
-// --- INPUT HANDLING (Updated for Divs & Pencil Mode) ---
+// --- INPUT HANDLING ---
 function enterNumber(val) {
-  if (!selectedCell) return;
+  // 1. HIGHLIGHT GLOBALLY First (Even if no cell is selected)
+  updateHighlights(val === "X" ? null : val);
 
-  // Save board snapshot for Undo
+  // 2. Prevent edits on empty selections or fixed cells
+  if (!selectedCell || selectedCell.dataset.fixed === "true") return;
+
   const snapshotBeforeMove = getBoardSnapshot();
   let stateChanged = false;
 
   if (val === "X") {
-    // Eraser clears everything (big number and notes)
     if (selectedCell.dataset.val !== "" || selectedCell.dataset.notes !== "") {
       selectedCell.dataset.val = "";
       selectedCell.dataset.notes = "";
@@ -492,28 +484,23 @@ function enterNumber(val) {
     }
   } else {
     if (isPencilMode) {
-      // Pencil Mode: Toggle Notes (ONLY if cell is empty of big numbers)
       if (selectedCell.dataset.val === "") {
         let notesArray = selectedCell.dataset.notes
           ? selectedCell.dataset.notes.split(",")
           : [];
-        if (notesArray.includes(val)) {
-          notesArray = notesArray.filter((n) => n !== val); // Remove note
-        } else {
-          notesArray.push(val); // Add note
-          notesArray.sort(); // Keep them in 1-9 order
+        if (notesArray.includes(val))
+          notesArray = notesArray.filter((n) => n !== val);
+        else {
+          notesArray.push(val);
+          notesArray.sort();
         }
         selectedCell.dataset.notes = notesArray.join(",");
         stateChanged = true;
       }
     } else {
-      // Normal Mode: Place Big Number
       if (selectedCell.dataset.val !== val) {
         selectedCell.dataset.val = val;
-        selectedCell.dataset.notes = ""; // Clear notes in this cell
-        selectedCell.style.color = "#333";
-
-        // Auto-remove this number from surrounding notes
+        selectedCell.dataset.notes = "";
         removeNotesFromPeers(
           selectedCell.dataset.row,
           selectedCell.dataset.col,
@@ -531,8 +518,6 @@ function enterNumber(val) {
     checkBoard();
     updateCounts();
   }
-
-  updateHighlights(val === "X" ? null : val);
 }
 
 document.querySelectorAll(".numpad-btn").forEach((btn) => {
@@ -542,9 +527,59 @@ document.querySelectorAll(".numpad-btn").forEach((btn) => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key >= "1" && e.key <= "9") enterNumber(e.key);
-  else if (e.key === "Backspace" || e.key === "Delete") enterNumber("X");
-  else if ((e.ctrlKey || e.metaKey) && e.key === "z") undoLastMove();
+  if (e.key >= "1" && e.key <= "9") {
+    enterNumber(e.key);
+  } else if (e.key === "Backspace" || e.key === "Delete") {
+    enterNumber("X");
+  } else if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+    undoLastMove();
+  } else if (
+    [
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+      "w",
+      "a",
+      "s",
+      "d",
+      "W",
+      "A",
+      "S",
+      "D",
+    ].includes(e.key)
+  ) {
+    if (!selectedCell) return;
+
+    let r = parseInt(selectedCell.dataset.row);
+    let c = parseInt(selectedCell.dataset.col);
+
+    switch (e.key.toLowerCase()) {
+      case "arrowup":
+      case "w":
+        r = Math.max(0, r - 1);
+        break;
+      case "arrowdown":
+      case "s":
+        r = Math.min(8, r + 1);
+        break;
+      case "arrowleft":
+      case "a":
+        c = Math.max(0, c - 1);
+        break;
+      case "arrowright":
+      case "d":
+        c = Math.min(8, c + 1);
+        break;
+    }
+
+    const newCell = document.querySelector(
+      `.cell[data-row="${r}"][data-col="${c}"]`,
+    );
+    if (newCell) {
+      newCell.click();
+    }
+  }
 });
 
 // --- TOOLS MENU UPDATES ---
@@ -554,11 +589,9 @@ document.getElementById("tool-validate").addEventListener("click", () => {
       const r = cell.dataset.row;
       const c = cell.dataset.col;
       const expectedValue = currentSolution[r][c].toString();
-      if (cell.dataset.val !== expectedValue) {
+      if (cell.dataset.val !== expectedValue)
         cell.classList.add("error-highlight");
-      } else {
-        cell.classList.remove("error-highlight");
-      }
+      else cell.classList.remove("error-highlight");
     }
   });
   document.getElementById("tools-modal").classList.add("hidden");
@@ -576,23 +609,19 @@ document.getElementById("tool-hint").addEventListener("click", () => {
     return;
   }
 
-  // Save snapshot so hints can be undone!
   moveHistory.push(getBoardSnapshot());
-
   const targetCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
   const r = targetCell.dataset.row;
   const c = targetCell.dataset.col;
   const correctValue = currentSolution[r][c].toString();
 
   targetCell.dataset.val = correctValue;
-  targetCell.dataset.notes = ""; // Overwrite any notes
-  targetCell.style.color = "#333";
+  targetCell.dataset.notes = "";
   targetCell.classList.remove("error-highlight");
   targetCell.dataset.fixed = "true";
   targetCell.classList.add("fixed");
   updateCellDisplay(targetCell);
 
-  // Auto-remove notes around the hint!
   removeNotesFromPeers(r, c, correctValue);
 
   targetCell.classList.add("hint-flash");
@@ -605,10 +634,49 @@ document.getElementById("tool-hint").addEventListener("click", () => {
   document.getElementById("tools-modal").classList.add("hidden");
 });
 
+// NEW: Auto Notes Logic
 document.getElementById("tool-notes").addEventListener("click", () => {
-  alert("Auto notes logic will go here!");
+  // 1. Take snapshot for Undo
+  moveHistory.push(getBoardSnapshot());
+
+  // 2. Read the current visible board into a 2D Array.
+  // IMPORTANT: only cells whose value actually matches the solution are used as
+  // constraints. A wrong guess is treated as if that cell were still empty, so it
+  // can never wrongly block a valid candidate number from showing up as a note
+  // elsewhere on the board. Without this, one incorrect entry anywhere in a row,
+  // column, or box could silently erase correct notes for every peer of that cell.
+  let currentDomBoard = Array.from({ length: 9 }, () => Array(9).fill(0));
+  document.querySelectorAll(".cell").forEach((cell) => {
+    let r = parseInt(cell.dataset.row);
+    let c = parseInt(cell.dataset.col);
+    if (
+      cell.dataset.val !== "" &&
+      parseInt(cell.dataset.val) === currentSolution[r][c]
+    ) {
+      currentDomBoard[r][c] = parseInt(cell.dataset.val);
+    }
+  });
+
+  // 3. Fill notes for all empty cells using our backtracking isSafe function
+  document.querySelectorAll(".cell").forEach((cell) => {
+    if (cell.dataset.val === "") {
+      let validNotes = [];
+      let r = parseInt(cell.dataset.row);
+      let c = parseInt(cell.dataset.col);
+
+      for (let i = 1; i <= 9; i++) {
+        if (isSafe(currentDomBoard, r, c, i)) {
+          validNotes.push(i.toString());
+        }
+      }
+
+      cell.dataset.notes = validNotes.join(",");
+      updateCellDisplay(cell);
+    }
+  });
+
+  // Close the menu
   document.getElementById("tools-modal").classList.add("hidden");
 });
 
-// Initialize First Game
 startNewGame();
