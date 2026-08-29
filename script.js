@@ -2,6 +2,9 @@ let currentSolution = [];
 let currentPuzzle = [];
 let selectedCell = null;
 let moveHistory = [];
+let redoStack = [];
+let hintTargetCell = null;
+let hintTargetValue = null;
 
 // Settings & State
 let isHighlightEnabled = true;
@@ -137,18 +140,19 @@ document.getElementById("nav-difficulty-btn").addEventListener("click", () => {
 
 document.getElementById("highlight-toggle").addEventListener("change", (e) => {
   isHighlightEnabled = e.target.checked;
+  localStorage.setItem("sudoku-highlight-enabled", isHighlightEnabled);
   updateHighlights(activeHighlightNumber);
 });
 
-// NEW: Dark Mode Toggle Logic
+// Dark Mode Toggle Logic (persisted)
 document.getElementById("dark-mode-toggle").addEventListener("change", (e) => {
   if (e.target.checked) document.body.classList.add("dark-mode");
   else document.body.classList.remove("dark-mode");
+  localStorage.setItem("sudoku-dark-mode", e.target.checked);
 });
 
 const pencilBtn = document.getElementById("pencil-btn");
-pencilBtn.addEventListener("click", () => {
-  isPencilMode = !isPencilMode;
+function applyPencilButtonState() {
   if (isPencilMode) {
     pencilBtn.classList.add("active");
     pencilBtn.classList.remove("secondary");
@@ -158,7 +162,54 @@ pencilBtn.addEventListener("click", () => {
     pencilBtn.classList.add("secondary");
     pencilBtn.innerHTML = `<span style="font-size: 20px;"><img src="Icons/pen-solid-full.svg" alt="" height="20px" width="20px"/></span> Pencil Mode: OFF`;
   }
+}
+pencilBtn.addEventListener("click", () => {
+  isPencilMode = !isPencilMode;
+  applyPencilButtonState();
+  localStorage.setItem("sudoku-pencil-mode", isPencilMode);
 });
+
+// --- PERSISTED SETTINGS ---
+// Restores dark mode, highlight toggle, and pencil mode from a previous visit
+// so a first-time player who sets these up doesn't have to redo them every time.
+function loadPersistedSettings() {
+  const savedDark = localStorage.getItem("sudoku-dark-mode");
+  if (savedDark === "true") {
+    document.body.classList.add("dark-mode");
+    document.getElementById("dark-mode-toggle").checked = true;
+  }
+
+  const savedHighlight = localStorage.getItem("sudoku-highlight-enabled");
+  if (savedHighlight !== null) {
+    isHighlightEnabled = savedHighlight === "true";
+    document.getElementById("highlight-toggle").checked = isHighlightEnabled;
+  }
+
+  const savedPencil = localStorage.getItem("sudoku-pencil-mode");
+  if (savedPencil === "true") {
+    isPencilMode = true;
+    applyPencilButtonState();
+  }
+}
+
+// --- PERSONAL BEST TIMES ---
+function getBestTimesMap() {
+  try {
+    return JSON.parse(localStorage.getItem("sudoku-best-times")) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function refreshBestTimeDisplay() {
+  const bestTimes = getBestTimesMap();
+  const best = bestTimes[diffModes[activeDiffIndex]];
+  const bestTimeElement = document.getElementById("best-time");
+  if (bestTimeElement) {
+    bestTimeElement.innerText =
+      best !== undefined ? `Best: ${formatTime(best)}` : "Best: --:--";
+  }
+}
 
 function showConfirmModal(msg, actionFunction) {
   document.getElementById("confirm-message").innerText = msg;
@@ -211,6 +262,7 @@ document
     ),
   );
 document.getElementById("nav-undo-btn").addEventListener("click", undoLastMove);
+document.getElementById("nav-redo-btn").addEventListener("click", redoLastMove);
 
 // --- STATE MANAGEMENT ---
 function getBoardSnapshot() {
@@ -265,6 +317,7 @@ function restartCurrentGame() {
     }
   });
   moveHistory = [];
+  redoStack = [];
   selectedCell = null;
   updateHighlights(null);
   updateCounts();
@@ -274,6 +327,7 @@ function restartCurrentGame() {
 
 function undoLastMove() {
   if (moveHistory.length === 0) return;
+  redoStack.push(getBoardSnapshot());
   const lastSnapshot = moveHistory.pop();
   document.querySelectorAll(".cell").forEach((cell, index) => {
     let snap = lastSnapshot[index];
@@ -282,6 +336,26 @@ function undoLastMove() {
     // Restore the fixed/locked state too - otherwise undoing a "Get a Hint" move
     // leaves the cell permanently blank AND locked, since it would still carry
     // fixed="true" from the hint even after its value is reverted.
+    if (snap.fixed !== undefined) {
+      cell.dataset.fixed = snap.fixed;
+      cell.classList.toggle("fixed", snap.fixed === "true");
+    }
+    cell.classList.remove("error-highlight");
+    updateCellDisplay(cell);
+  });
+  updateCounts();
+  updateHighlights(activeHighlightNumber);
+  checkBoard();
+}
+
+function redoLastMove() {
+  if (redoStack.length === 0) return;
+  moveHistory.push(getBoardSnapshot());
+  const nextSnapshot = redoStack.pop();
+  document.querySelectorAll(".cell").forEach((cell, index) => {
+    let snap = nextSnapshot[index];
+    cell.dataset.val = snap.val;
+    cell.dataset.notes = snap.notes;
     if (snap.fixed !== undefined) {
       cell.dataset.fixed = snap.fixed;
       cell.classList.toggle("fixed", snap.fixed === "true");
@@ -375,9 +449,23 @@ function checkBoard() {
   });
 
   if (isComplete && isCorrect) {
-    message.innerText = `Congratulations! You solved ${diffModes[activeDiffIndex]} Mode!`;
-    message.style.color = "#4caf50";
     stopTimer();
+
+    const diffName = diffModes[activeDiffIndex];
+    const bestTimes = getBestTimesMap();
+    const prevBest = bestTimes[diffName];
+    const isNewBest = prevBest === undefined || secondsElapsed < prevBest;
+
+    if (isNewBest) {
+      bestTimes[diffName] = secondsElapsed;
+      localStorage.setItem("sudoku-best-times", JSON.stringify(bestTimes));
+    }
+    refreshBestTimeDisplay();
+
+    message.innerText = isNewBest
+      ? `New Best! You solved ${diffName} Mode in ${formatTime(secondsElapsed)}!`
+      : `Congratulations! You solved ${diffName} Mode in ${formatTime(secondsElapsed)}!`;
+    message.style.color = "#4caf50";
 
     confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
     boardElement.classList.add("board-win-pulse");
@@ -393,9 +481,11 @@ function startNewGame() {
   setTimeout(() => {
     selectedCell = null;
     moveHistory = [];
+    redoStack = [];
     updateHighlights(null);
     generateNewPuzzle(activeDiffIndex);
     startTimer();
+    refreshBestTimeDisplay();
     message.innerText = "";
 
     for (let row = 0; row < 9; row++) {
@@ -513,6 +603,7 @@ function enterNumber(val) {
 
   if (stateChanged) {
     moveHistory.push(snapshotBeforeMove);
+    redoStack = [];
     selectedCell.classList.remove("error-highlight");
     updateCellDisplay(selectedCell);
     checkBoard();
@@ -533,6 +624,9 @@ document.addEventListener("keydown", (e) => {
     enterNumber("X");
   } else if ((e.ctrlKey || e.metaKey) && e.key === "z") {
     undoLastMove();
+  } else if ((e.ctrlKey || e.metaKey) && (e.key === "y" || e.key === "Y")) {
+    e.preventDefault();
+    redoLastMove();
   } else if (
     [
       "ArrowUp",
@@ -597,7 +691,13 @@ document.getElementById("tool-validate").addEventListener("click", () => {
   document.getElementById("tools-modal").classList.add("hidden");
 });
 
+// Explain-first hint: rather than instantly filling in the answer, this first
+// tries to explain WHY a cell must hold a particular number (naked single /
+// hidden single reasoning), and only reveals the number if the player asks for
+// it. This teaches solving technique instead of training players to spam hints.
 document.getElementById("tool-hint").addEventListener("click", () => {
+  document.getElementById("tools-modal").classList.add("hidden");
+
   let emptyCells = [];
   document.querySelectorAll(".cell").forEach((cell) => {
     if (cell.dataset.val === "") emptyCells.push(cell);
@@ -605,15 +705,141 @@ document.getElementById("tool-hint").addEventListener("click", () => {
 
   if (emptyCells.length === 0) {
     alert("The board is full!");
-    document.getElementById("tools-modal").classList.add("hidden");
     return;
   }
 
+  // Build a constraint board from clues + only CORRECT entries (same principle
+  // as Automatic Notes) so the reasoning we explain is always sound, even if
+  // the player has a wrong guess sitting elsewhere on the board.
+  let board = Array.from({ length: 9 }, () => Array(9).fill(0));
+  document.querySelectorAll(".cell").forEach((cell) => {
+    let r = parseInt(cell.dataset.row);
+    let c = parseInt(cell.dataset.col);
+    if (
+      cell.dataset.val !== "" &&
+      parseInt(cell.dataset.val) === currentSolution[r][c]
+    ) {
+      board[r][c] = parseInt(cell.dataset.val);
+    }
+  });
+
+  function candidatesFor(r, c) {
+    let cands = [];
+    for (let n = 1; n <= 9; n++) {
+      if (isSafe(board, r, c, n)) cands.push(n);
+    }
+    return cands;
+  }
+
+  let chosenCell = null;
+  let explanation = "";
+
+  // 1. Look for a "naked single": a cell with only one possible candidate left.
+  for (const cell of emptyCells) {
+    const r = parseInt(cell.dataset.row);
+    const c = parseInt(cell.dataset.col);
+    const cands = candidatesFor(r, c);
+    if (cands.length === 1) {
+      chosenCell = cell;
+      explanation = `This square only has one number left that fits: ${cands[0]}. Every other number 1-9 already appears somewhere in its row, column, or 3x3 box.`;
+      break;
+    }
+  }
+
+  // 2. Otherwise look for a "hidden single": a number that can only go in one
+  // square within a given row, column, or box, even if that square has other
+  // candidates too.
+  if (!chosenCell) {
+    searchHiddenSingle: for (const cell of emptyCells) {
+      const r = parseInt(cell.dataset.row);
+      const c = parseInt(cell.dataset.col);
+      const cands = candidatesFor(r, c);
+
+      for (const n of cands) {
+        let onlyInRow = true;
+        for (let cc = 0; cc < 9 && onlyInRow; cc++) {
+          if (cc === c || board[r][cc] !== 0) continue;
+          if (candidatesFor(r, cc).includes(n)) onlyInRow = false;
+        }
+        if (onlyInRow) {
+          chosenCell = cell;
+          explanation = `Look at this row - ${n} can only fit in this one square. Every other empty square in the row already rules ${n} out.`;
+          break searchHiddenSingle;
+        }
+
+        let onlyInCol = true;
+        for (let rr = 0; rr < 9 && onlyInCol; rr++) {
+          if (rr === r || board[rr][c] !== 0) continue;
+          if (candidatesFor(rr, c).includes(n)) onlyInCol = false;
+        }
+        if (onlyInCol) {
+          chosenCell = cell;
+          explanation = `Look at this column - ${n} can only fit in this one square. Every other empty square in the column already rules ${n} out.`;
+          break searchHiddenSingle;
+        }
+
+        let br = Math.floor(r / 3) * 3;
+        let bc = Math.floor(c / 3) * 3;
+        let onlyInBox = true;
+        for (let i = 0; i < 3 && onlyInBox; i++) {
+          for (let j = 0; j < 3 && onlyInBox; j++) {
+            let rr = br + i,
+              cc = bc + j;
+            if ((rr === r && cc === c) || board[rr][cc] !== 0) continue;
+            if (candidatesFor(rr, cc).includes(n)) onlyInBox = false;
+          }
+        }
+        if (onlyInBox) {
+          chosenCell = cell;
+          explanation = `Look at this 3x3 box - ${n} can only fit in this one square, even though this square has other candidates too.`;
+          break searchHiddenSingle;
+        }
+      }
+    }
+  }
+
+  // 3. Fallback: pick any empty cell and be upfront that it needs a more
+  // advanced technique rather than pretending there's simple logic here.
+  if (!chosenCell) {
+    chosenCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    explanation =
+      "This one needs a more advanced technique to spot by eye. Want me to just fill it in?";
+  }
+
+  hintTargetCell = chosenCell;
+  hintTargetValue =
+    currentSolution[parseInt(chosenCell.dataset.row)][
+      parseInt(chosenCell.dataset.col)
+    ].toString();
+
+  document
+    .querySelectorAll(".cell")
+    .forEach((c) => c.classList.remove("selected"));
+  chosenCell.classList.add("selected");
+  selectedCell = chosenCell;
+  chosenCell.scrollIntoView({
+    behavior: "smooth",
+    block: "center",
+    inline: "center",
+  });
+
+  document.getElementById("hint-explanation").innerText = explanation;
+  document.getElementById("hint-modal").classList.remove("hidden");
+});
+
+document.getElementById("hint-gotit-btn").addEventListener("click", () => {
+  document.getElementById("hint-modal").classList.add("hidden");
+});
+
+document.getElementById("hint-reveal-btn").addEventListener("click", () => {
+  document.getElementById("hint-modal").classList.add("hidden");
+  if (!hintTargetCell) return;
+
   moveHistory.push(getBoardSnapshot());
-  const targetCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-  const r = targetCell.dataset.row;
-  const c = targetCell.dataset.col;
-  const correctValue = currentSolution[r][c].toString();
+  redoStack = [];
+
+  const targetCell = hintTargetCell;
+  const correctValue = hintTargetValue;
 
   targetCell.dataset.val = correctValue;
   targetCell.dataset.notes = "";
@@ -622,7 +848,11 @@ document.getElementById("tool-hint").addEventListener("click", () => {
   targetCell.classList.add("fixed");
   updateCellDisplay(targetCell);
 
-  removeNotesFromPeers(r, c, correctValue);
+  removeNotesFromPeers(
+    targetCell.dataset.row,
+    targetCell.dataset.col,
+    correctValue,
+  );
 
   targetCell.classList.add("hint-flash");
   setTimeout(() => {
@@ -631,13 +861,16 @@ document.getElementById("tool-hint").addEventListener("click", () => {
 
   updateCounts();
   checkBoard();
-  document.getElementById("tools-modal").classList.add("hidden");
+
+  hintTargetCell = null;
+  hintTargetValue = null;
 });
 
 // NEW: Auto Notes Logic
 document.getElementById("tool-notes").addEventListener("click", () => {
   // 1. Take snapshot for Undo
   moveHistory.push(getBoardSnapshot());
+  redoStack = [];
 
   // 2. Read the current visible board into a 2D Array.
   // IMPORTANT: only cells whose value actually matches the solution are used as
@@ -679,4 +912,5 @@ document.getElementById("tool-notes").addEventListener("click", () => {
   document.getElementById("tools-modal").classList.add("hidden");
 });
 
+loadPersistedSettings();
 startNewGame();

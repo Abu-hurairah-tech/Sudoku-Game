@@ -35,12 +35,21 @@
             width="30px"
           />
         </button>
-        <button id="nav-undo-btn" title="Undo Last Move">
+        <button id="nav-undo-btn" title="Undo Last Move (Ctrl+Z)">
           <img
             src="Icons/undo-svgrepo-com.svg"
             alt=""
             height="30px"
             width="30px"
+          />
+        </button>
+        <button id="nav-redo-btn" title="Redo Last Move (Ctrl+Y)">
+          <img
+            src="Icons/undo-svgrepo-com.svg"
+            alt=""
+            height="30px"
+            width="30px"
+            class="icon-flip"
           />
         </button>
         <button id="nav-restart-btn" title="Restart Current Board">
@@ -59,6 +68,7 @@
           <div class="header-left"></div>
           <div class="header-center">
             <div id="timer">00:00</div>
+            <div id="best-time" class="best-time-label">Best: --:--</div>
           </div>
           <div class="header-right">
             <h1>SUDOKU GAME</h1>
@@ -71,7 +81,7 @@
           <div class="left-panel">
             <p id="message"></p>
 
-            <!-- NEW: Pencil Mode Button -->
+            <!-- Pencil Mode Button -->
             <button
               id="pencil-btn"
               class="menu-btn secondary"
@@ -165,6 +175,27 @@
       </div>
     </div>
 
+    <!-- Hint Explanation Modal -->
+    <div id="hint-modal" class="modal hidden">
+      <div class="modal-content text-center">
+        <span class="close-x close-modal" data-target="hint-modal"
+          >&times;</span
+        >
+        <h2>Hint</h2>
+        <p id="hint-explanation" class="hint-explanation-text">
+          Thinking it through...
+        </p>
+        <div class="confirm-actions">
+          <button id="hint-gotit-btn" class="menu-btn secondary">
+            Got It
+          </button>
+          <button id="hint-reveal-btn" class="menu-btn">
+            Reveal Answer
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Difficulty Modal -->
     <div id="difficulty-modal" class="modal hidden">
       <div class="modal-content text-center">
@@ -213,7 +244,7 @@
             <span class="slider round"></span>
           </label>
         </div>
-        <!-- NEW: Dark Mode Toggle -->
+        <!-- Dark Mode Toggle -->
         <div class="setting-item" style="margin-top: 15px">
           <span>Dark Mode</span>
           <label class="switch">
