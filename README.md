@@ -77,6 +77,6 @@ Every move is a snapshot. Roll back or replay with `Ctrl+Z` / `Ctrl+Y` without l
 ### 1️⃣ **Clone the Repository**
 
 ```bash
-git clone https://github.com/Abu-hurairah-tech/Sodoku-Game.git
-cd Sodoku-Game
+git clone https://github.com/Abu-hurairah-tech/Sudoku-Game.git
+cd Sudoku-Game
 ```
